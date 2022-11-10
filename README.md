@@ -7,7 +7,9 @@ Ya He, Kehan Wang, Yumeng Sun, Bokai Zhang
 
 ### Introduction
 In this project, we aim to develop a classic logic puzzle game called Minesweeper using Haskell. For more rules of this game, please see Wiki for [Minesweeper](https://en.wikipedia.org/wiki/Minesweeper_(video_game)).
-![](https://codimd.s3.shivering-isles.com/demo/uploads/bb54b80c-60eb-4b7d-9f50-9f7a1506612c.png)
+
+![](https://raw.githubusercontent.com/heya30/CSE230_Minesweeper/main/images/minesweeper.png)
+
 The basic goal of the game is to open all non-mined cells and flag all mined cells in the shortest time.
 
 There are three situations when we select a cell:
