@@ -29,8 +29,5 @@ There are three situations when the player choose to open a cell:
 - Allow users to leave or restart during the game
 
 
-
-### Timeline
-
 ### References
 - [Brick](https://github.com/jtdaugherty/brick)
