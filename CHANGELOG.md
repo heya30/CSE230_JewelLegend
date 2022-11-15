@@ -1,4 +1,4 @@
-# Revision history for CSE230-Minesweeper
+# Revision history for CSE230-JewelLegend
 
 ## 0.1.0.0 -- YYYY-mm-dd
 

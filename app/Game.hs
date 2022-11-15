@@ -4,8 +4,8 @@ import Control.Applicative ((<|>))
 import Control.Monad (guard)
 import Data.Maybe (fromMaybe)
 
-import Data.Sequence (Seq, ViewL(..), ViewR(..), (<|))
-import qualified Data.Sequence as S
+-- import Data.Sequence (Seq, ViewL(..), ViewR(..), (<|))
+-- import qualified Data.Sequence as S
 -- import Lens.Micro.TH (makeLenses)
 -- import System.Random (Random(..), newStdGen)
 

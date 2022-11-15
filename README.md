@@ -29,7 +29,9 @@ There are two situations when a player swaps two cubes:
 - Allow users to swap cubes by controlling the keyboard
 - Allow users to leave or restart during the game
 
-
+### How to Play
+stack build
+stack exec CSE230-JewelLegend
 
 ### References
 - [Brick](https://github.com/jtdaugherty/brick)
