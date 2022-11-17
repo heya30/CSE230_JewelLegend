@@ -32,19 +32,35 @@ data State = State
 type ResourceName = String
 
 initBoard :: BoardSize -> JewelSize -> Board
-initBoard bsize gsize = error "TODO"
+initBoard bsize gsize = [[Block {val = 1}, Block {val = 2}, Block {val = 3}],
+                         [Block {val = 4}, Block {val = 5}, Block {val = 6}], 
+                         [Block {val = 7}, Block {val = 8}, Block {val = 9}]]
 
-showBoard :: Board -> [Widget ResourceName]
-showBoard bd = [vBox $ map drawRow bd]
+drawBoard :: Board -> [Widget ResourceName]
+drawBoard bd = [vBox $ map drawRow bd]
 
 drawRow :: [Block] -> Widget n
-drawRow blks = hBox $ map drawCol blks
+drawRow blks = vBox $ map drawCol blks
 
 drawCol :: Block -> Widget n
 drawCol blk = str (show (val blk))
 
 initGame :: Difficulty -> IO State
-initGame diff = error "TODO"
+initGame diff = let iBoard = initBoard 3 3 in
+                let iState = State {board = iBoard, score = 0} in -- TODO: use iState later
+                do 
+                   _ <- defaultMain jLApp iBoard
+                   return iState
 
 playGame :: State -> IO ()
 playGame b = error "TODO"
+
+jLApp :: App Board e ResourceName
+jLApp = App 
+        {
+            appDraw = drawBoard,
+            appChooseCursor = showFirstCursor,
+            -- appHandleEvent = ,
+            appStartEvent = pure,
+            appAttrMap = const $ attrMap mempty []
+        }

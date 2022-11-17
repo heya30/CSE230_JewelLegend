@@ -11,11 +11,13 @@ main = do
 
 -- Show welcome message
 welcome :: IO ()
-welcome = error "TODO"
+welcome = putStrLn "Welcome!"
 
 -- Ask for difficulty
 pickLevel :: IO Game.Difficulty
-pickLevel = error "TODO"
+pickLevel = putStrLn "Please select the difficulty level: (Easy/Medium/Hard)" >>
+            -- TODO: parsing input
+            return Game.Easy
 
 -- Show score and ask for restart or exit
 handleEndGame :: Game.State -> IO ()
