@@ -30,8 +30,13 @@ There are two situations when a player swaps two cubes:
 - Allow users to leave or restart during the game
 
 ### How to Play
-stack build
-stack exec CSE230-JewelLegend
+Before setting up, remove `stack.yaml` and `stack.yaml.lock`, and try `stack init`
+
+`stack setup`
+
+`stack build`
+
+`stack exec CSE230-JewelLegend`
 
 ### References
 - [Brick](https://github.com/jtdaugherty/brick)

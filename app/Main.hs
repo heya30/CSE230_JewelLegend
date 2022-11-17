@@ -1,11 +1,5 @@
 module Main where
 
-import Control.Monad (when)
-import System.Exit (exitSuccess)
-import Text.Read (readMaybe)
-
-
-import Prelude
 import Game
 
 main :: IO ()
@@ -20,11 +14,11 @@ welcome :: IO ()
 welcome = error "TODO"
 
 -- Ask for difficulty
-pickLevel :: Game.Difficulty
+pickLevel :: IO Game.Difficulty
 pickLevel = error "TODO"
 
 -- Show score and ask for restart or exit
-handleEndGame :: Game.Board -> IO ()
+handleEndGame :: Game.State -> IO ()
 handleEndGame b = error "TODO"
 
 
