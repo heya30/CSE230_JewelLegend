@@ -107,7 +107,6 @@ handleSelectEvent s e =
     case e of 
         VtyEvent vtye -> 
             case vtye of
-                -- EvKey (KChar 'r') [] -> continue $ State {board = setBoardState ((removeBlock (getBoardList (board(s))))), score = 0}
                 EvKey (KChar 'a') [] -> continue $ (cancelBlocks s)
                 EvKey (KChar 'q') [] -> halt s -- TODO: may change exit key (q)
                 -- TODO: capture keyboard/mouse event
@@ -116,20 +115,32 @@ handleSelectEvent s e =
 
 
 cancelBlocks :: State -> State
-cancelBlocks s = State {
-    board = setBoardState ((addNewBlocks(downBlock(removeBlock (getBoardList (board(s))))))), 
-    score = 0
-    }
+cancelBlocks s = 
+    let oldBoard = (getBoardList (board(s))) in
+        let removeBoard = (removeBlock oldBoard) in
+            let newScore = (eliminatedNum removeBoard)
+                newBoard = setBoardState ((addNewBlocks(downBlock(removeBoard)))) in
+                if (newScore == 0)
+                    then State {board = newBoard, score = score (s)}
+                    else State {board = newBoard, score = (score (s) + newScore)}
+                    -- else (cancelBlocks State {board = newBoard, score = (score (s) + newScore)})
 
 
--- TODO: maybe rewrite by using mapWithIndex
+-- TODO: may rewrite by using mapWithIndex
 removeBlock :: [[Block]] -> [[Block]]
 removeBlock board = zipWith f [0..] board
           where 
             f  j row = zipWith3 f' (replicate (length row) j) [0..] row
-            f' i j x = if ifBlockElimiable board (i) (j)
+            f' i j x = if ifBlockEliminable board (i) (j)
                         then Block {val = -1}
                         else x
+
+eliminatedNum :: [[Block]] -> Int
+eliminatedNum board = foldr f 0 board
+    where f x acc =  (f' x) + acc
+          f' :: [Block] -> Int
+          f' = foldr (\x n -> if x == Block {val = -1} then n+1 else n) 0
+
 
 addNewBlocks :: [[Block]] -> [[Block]]
 addNewBlocks board = map f board
@@ -137,9 +148,19 @@ addNewBlocks board = map f board
             f row = map f' row
             f' b = 
                 if val(b) == -1
-                    then Block{val=1}  -- TODO: add Random Block
+                    then Block{val=(1)}  -- TODO: add Random Block
                     else b
 
+
+makeRandomInt::Int -> Int
+makeRandomInt seed = do
+  let gen = mkStdGen seed
+  fst $ randomR (1, 10) gen
+
+randomNum :: IO Int
+randomNum = do
+    num <- randomIO :: IO Int
+    return (makeRandomInt num)
 
 downBlock :: [[Block]] -> [[Block]]
 downBlock block = transpose((transpose(transpose(map leftRow (transpose block)))))
@@ -150,14 +171,15 @@ mergeRow row = case row of
   [] -> []
 
 leftRow :: [Block] -> [Block]
-leftRow row = (replicate (3 - (length x)) (Block {val = -1})) ++ x 
+leftRow row = (replicate ((length row) - (length x)) (Block {val = -1})) ++ x 
   where x = mergeRow row
 
 leftBlock :: [[Block]] -> [[Block]]
 leftBlock g = map leftRow g
+       
 
-ifBlockElimiable :: [[Block]] -> Int -> Int -> Bool
-ifBlockElimiable board row column = matchInRow board row column
+ifBlockEliminable :: [[Block]] -> Int -> Int -> Bool
+ifBlockEliminable board row column = matchInRow board row column
     || matchInRow (transpose board) column row
 
 
@@ -189,7 +211,7 @@ listToNonEmptyCursor l = case NE.nonEmpty l of
 
 
 getBoardList :: Board -> [[Block]]
-getBoardList s = map (\row -> nonEmptyCursorToList row) (nonEmptyCursorToList s)
+getBoardList s = map nonEmptyCursorToList (nonEmptyCursorToList s)
 
 
 setBoardState :: [[Block]] -> Board
