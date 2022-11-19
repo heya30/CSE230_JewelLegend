@@ -148,7 +148,7 @@ addNewBlocks board = map f board
             f row = map f' row
             f' b = 
                 if val(b) == -1
-                    then Block{val=(1)}  -- TODO: add Random Block
+                    then Block{val=1}  -- TODO: add Random Block
                     else b
 
 
