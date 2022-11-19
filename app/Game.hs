@@ -26,16 +26,10 @@ data Difficulty = Easy | Medium | Hard
 
 data Block = Block
     {
-        val::JewelVal,
-        pos::Pos
+        val::JewelVal
     }
     deriving (Eq, Show)
 
-data Pos = Pos 
-  { pRow :: Int  -- 0 <= pRow < dim 
-  , pCol :: Int  -- 0 <= pCol < dim
-  }
-  deriving (Eq, Ord, Show)
 
 type Board = NonEmptyCursor Row
 
@@ -55,13 +49,11 @@ testBoard = initBoardValue 3 3
 
 initBoardValue :: BoardSize -> JewelSize -> [[Block]]
 initBoardValue bsize gsize = [
-    [Block {val = 4, pos = (getPos 0 0)}, Block {val = 2, pos = (getPos 0 1)}, Block {val = 3, pos = (getPos 0 1)}],
-    [Block {val = 4, pos = (getPos 1 0)}, Block {val = 4, pos = (getPos 1 1)}, Block {val = 4, pos = (getPos 1 2)}],
-    [Block {val = 4, pos = (getPos 2 0)}, Block {val = 8, pos = (getPos 2 1)}, Block {val = 1, pos = (getPos 2 2)}]]
+    [Block {val = 4}, Block {val = 2}, Block {val = 3}],
+    [Block {val = 4}, Block {val = 2}, Block {val = 4}],
+    [Block {val = 4}, Block {val = 2}, Block {val = 1}]]
 
 
-getPos::Int -> Int -> Pos
-getPos col row = Pos{ pRow=col, pCol=row}
 
 initBoard :: BoardSize -> JewelSize -> Board -- TODO: generate board by bsize and gsize
 initBoard bsize gsize = setBoardState (initBoardValue bsize gsize)
@@ -115,8 +107,8 @@ handleSelectEvent s e =
     case e of 
         VtyEvent vtye -> 
             case vtye of
-                EvKey (KChar 'r') [] -> continue $ State {board = setBoardState ((removeBlock (getBoardList (board(s))))), score = 0}
-                EvKey (KChar 'a') [] -> continue $ State {board = setBoardState ((addNewBlocks (getBoardList (board(s))))), score = 0}
+                -- EvKey (KChar 'r') [] -> continue $ State {board = setBoardState ((removeBlock (getBoardList (board(s))))), score = 0}
+                EvKey (KChar 'a') [] -> continue $ (cancelBlocks s)
                 EvKey (KChar 'q') [] -> halt s -- TODO: may change exit key (q)
                 -- TODO: capture keyboard/mouse event
                 _ -> continue s
@@ -124,24 +116,45 @@ handleSelectEvent s e =
 
 
 cancelBlocks :: State -> State
-cancelBlocks = error "TODO"
+cancelBlocks s = State {
+    board = setBoardState ((addNewBlocks(downBlock(removeBlock (getBoardList (board(s))))))), 
+    score = 0
+    }
 
-mapOnBoard :: (a -> b) -> [[a]] -> [[b]]
-mapOnBoard f' board = map (map f') board
 
+-- TODO: maybe rewrite by using mapWithIndex
 removeBlock :: [[Block]] -> [[Block]]
-removeBlock board = mapOnBoard f' board 
-          where f' b  = if ifBlockElimiable board (pRow (pos(b))) (pCol (pos(b)))
-                            then Block {val = -1, pos = pos(b)}
-                            else b
+removeBlock board = zipWith f [0..] board
+          where 
+            f  j row = zipWith3 f' (replicate (length row) j) [0..] row
+            f' i j x = if ifBlockElimiable board (i) (j)
+                        then Block {val = -1}
+                        else x
+
+addNewBlocks :: [[Block]] -> [[Block]]
+addNewBlocks board = map f board
+          where 
+            f row = map f' row
+            f' b = 
+                if val(b) == -1
+                    then Block{val=1}  -- TODO: add Random Block
+                    else b
 
 
-addNewBlocks :: [[Block]]-> [[Block]]
-addNewBlocks board = mapOnBoard f' board
-          where f' b = if val (b) == -1
-                            then Block {val = 1, pos = pos(b)}
-                            else b
+downBlock :: [[Block]] -> [[Block]]
+downBlock block = transpose((transpose(transpose(map leftRow (transpose block)))))
 
+mergeRow :: [Block] -> [Block]
+mergeRow row = case row of
+  x:xs -> if val(x) == -1 then mergeRow xs else x:(mergeRow xs)
+  [] -> []
+
+leftRow :: [Block] -> [Block]
+leftRow row = (replicate (3 - (length x)) (Block {val = -1})) ++ x 
+  where x = mergeRow row
+
+leftBlock :: [[Block]] -> [[Block]]
+leftBlock g = map leftRow g
 
 ifBlockElimiable :: [[Block]] -> Int -> Int -> Bool
 ifBlockElimiable board row column = matchInRow board row column
