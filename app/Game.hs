@@ -51,15 +51,15 @@ testBoard :: [[Block]]
 testBoard = initBoardValue 3 3
 
 initBoardValue :: BoardSize -> JewelSize -> [[Block]]
-initBoardValue bsize gsize = [
+initBoardValue bsize jsize = [
     [Block {val = 4}, Block {val = 2}, Block {val = 3}],
     [Block {val = 4}, Block {val = 2}, Block {val = 4}],
     [Block {val = 4}, Block {val = 2}, Block {val = 1}]]
 
 
 
-initBoard :: BoardSize -> JewelSize -> Board -- TODO: generate board by bsize and gsize
-initBoard bsize gsize = initBoardValue bsize gsize
+initBoard :: BoardSize -> JewelSize -> Board -- TODO: generate board by bsize and jsize
+initBoard bsize jsize = initBoardValue bsize jsize
 
 shuffleBoard :: State -> State
 shuffleBoard s = s -- TODO
@@ -95,15 +95,12 @@ drawBlock blk = str (show (val blk) ++ "  ") -- TODO
 drawBlockSelected :: Block -> Widget n
 drawBlockSelected blk = str (show (val blk) ++ "< ") -- TODO
 
-initGame :: Difficulty -> IO State
+initGame :: Difficulty -> IO State -- TODO
 initGame diff = let iBoard = initBoard 3 3 in
                 let iState = State {board = iBoard, score = 0, selected = False, row = 0, col = 0} in
                 do 
                    _ <- defaultMain jLApp iState
                    return iState
-
-playGame :: State -> IO ()
-playGame b = error "TODO"
 
 jLApp :: App State e ResourceName
 jLApp = App 
@@ -121,32 +118,52 @@ handleSelectEvent s e =
         VtyEvent vtye -> 
             case vtye of
                 EvKey (KChar 'a') [] -> continue $ (cancelBlocks s)
-                EvKey (KChar 'q') [] -> halt s
+                EvKey (KEsc) [] -> halt s
                 EvKey (KChar 's') [] -> continue $ (shuffleBoard s)
-                -- EvKey (KEnter) [] -> continue $ s {selected = True}
-                -- EvKey (KUp) [] ->
-                --     case selected s of
-                --         True -> let newState = cancelBlocks (swapBlock s DirUp) in
-                --                 if score newState > score s
-                --                     then continue newState
-                --                     else continue s
-                --         False -> continue $ (moveCursor s DirUp)
+                EvKey (KEnter) [] -> continue $ s {selected = True}
+                EvKey (KUp) [] -> continue $ (handleDirection s DirUp)
+                EvKey (KDown) [] -> continue $ (handleDirection s DirDown)
+                EvKey (KLeft) [] -> continue $ (handleDirection s DirLeft)
+                EvKey (KRight) [] -> continue $ (handleDirection s DirRight)
                 _ -> continue s
         _ -> continue s
 
--- moveCursor :: State -> Direction -> State
--- moveCursor s d = case d of
---                     DirUp -> let rowIndex = nonEmptyCursorSelection (board s) in
---                                 let colIndex = nonEmptyCursorSelection (nonEmptyCursorCurrent (board s)) in
---                                     let newBoard = nonEmptyCursorSelectIndex (rowIndex - 1) (board s) in
---                                         case newBoard of
---                                             Just newBoard' -> 
+handleDirection :: State -> Game.Direction -> State
+handleDirection s d = case selected s of
+                        True -> let newState = cancelBlocks (swapByDir s d) in
+                                if score newState > score s
+                                    then newState
+                                    else s
+                        False -> moveCursor s d
 
---                     _ -> s
+moveCursor :: State -> Game.Direction -> State
+moveCursor s d = case d of
+                    DirUp -> if row s > 0
+                                then s {row = (row s) - 1}
+                                else s
+                    DirDown -> if row s < length (board s) - 1
+                                then s {row = (row s) + 1}
+                                else s
+                    DirLeft -> if col s > 0
+                                then s {col = (col s) - 1}
+                                else s
+                    DirRight -> if col s < length (head (board s)) - 1
+                                then s {col = (col s) + 1}
+                                else s
 
--- swapBlock :: State -> Direction -> State
--- swapBlock s d = let b = board s in
---                 s
+swapByDir :: State -> Game.Direction -> State
+swapByDir s d = let b = board s
+                    r = row s
+                    c = col s
+                    newR = row (moveCursor s d)
+                    newC = col (moveCursor s d) in
+                s {board = swapBlock b r c newR newC, selected = False}
+                            
+swapBlock :: Board -> Int -> Int -> Int -> Int -> Board
+swapBlock b row1 col1 row2 col2 = [[get r c x | (c, x) <- zip [0..length temp - 1] temp] | (r, temp) <- zip [0..length b - 1] b]
+                                    where get r c x | (r == row1) && (c == col1) = (b !! row2) !! col2
+                                                    | (r == row2) && (c == col2) = (b !! row1) !! col1
+                                                    | otherwise = x
 
 cancelBlocks :: State -> State
 cancelBlocks s = 
