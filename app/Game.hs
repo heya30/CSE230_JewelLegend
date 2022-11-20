@@ -41,7 +41,8 @@ data State = State
         score::Int,
         selected::Bool,
         row::Int,
-        col::Int
+        col::Int,
+        seed::Int
     }
     deriving (Eq, Show)
 
@@ -51,15 +52,11 @@ testBoard :: [[Block]]
 testBoard = initBoardValue 3 3
 
 initBoardValue :: BoardSize -> JewelSize -> [[Block]]
-initBoardValue bsize jsize = [
-    [Block {val = 4}, Block {val = 2}, Block {val = 3}],
-    [Block {val = 4}, Block {val = 2}, Block {val = 4}],
-    [Block {val = 4}, Block {val = 2}, Block {val = 1}]]
-
-
+initBoardValue bsize jsize = replicate bsize (replicate bsize Block {val = 1})
 
 initBoard :: BoardSize -> JewelSize -> Board -- TODO: generate board by bsize and jsize
 initBoard bsize jsize = initBoardValue bsize jsize
+
 
 shuffleBoard :: State -> State
 shuffleBoard s = s -- TODO
@@ -96,8 +93,9 @@ drawBlockSelected :: Block -> Widget n
 drawBlockSelected blk = str (show (val blk) ++ "< ") -- TODO
 
 initGame :: Difficulty -> IO State -- TODO
-initGame diff = let iBoard = initBoard 3 3 in
-                let iState = State {board = iBoard, score = 0, selected = False, row = 0, col = 0} in
+initGame diff = let iBoard = initBoard 10 3 in
+                let init = State {board = iBoard, score = 0, selected = False, row = 0, col = 0, seed=33} in
+                let iState = ((cancelBlocks init) {score =0}) in
                 do 
                    _ <- defaultMain jLApp iState
                    return iState
@@ -170,11 +168,12 @@ cancelBlocks s =
     let oldBoard = board s in
         let removeBoard = (removeBlock oldBoard) in
             let newScore = (eliminatedNum removeBoard)
-                newBoard = (addNewBlocks(downBlock(removeBoard))) in
+                newBoard = (addNewBlocks(downBlock(removeBoard)) (seed(s))) in
                 if (newScore == 0)
-                    then s {board = newBoard, score = score (s)}
-                    else s {board = newBoard, score = (score (s) + newScore)}
-                    -- else (cancelBlocks s {board = newBoard, score = (score (s) + newScore)})
+                    then s {selected = False}
+                    else (cancelBlocks s {board = newBoard, score = (score (s) + newScore), 
+                                            selected = False, seed=newScore+seed(s)})
+              
 
 
 -- TODO: may rewrite by using mapWithIndex
@@ -193,25 +192,20 @@ eliminatedNum board = foldr f 0 board
           f' = foldr (\x n -> if x == Block {val = -1} then n+1 else n) 0
 
 
-addNewBlocks :: [[Block]] -> [[Block]]
-addNewBlocks board = map f board
+addNewBlocks :: [[Block]] -> Int -> [[Block]]
+addNewBlocks board seed = zipWith f [0..] board
           where 
-            f row = map f' row
-            f' b = 
-                if val(b) == -1
-                    then Block{val=1}  -- TODO: add Random Block
-                    else b
-
+            f  j row = zipWith3 f' (replicate (length row) j) [0..] row
+            f' i j x = if val(x) == -1
+                        then Block {val = (makeRandomInt (seed+10*i+5*j))}
+                        else x
 
 makeRandomInt::Int -> Int
 makeRandomInt seed = do
   let gen = mkStdGen seed
-  fst $ randomR (1, 10) gen
+  fst $ randomR (1, 5) gen
 
-randomNum :: IO Int
-randomNum = do
-    num <- randomIO :: IO Int
-    return (makeRandomInt num)
+
 
 downBlock :: [[Block]] -> [[Block]]
 downBlock block = transpose((transpose(transpose(map leftRow (transpose block)))))
