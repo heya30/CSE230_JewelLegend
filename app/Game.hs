@@ -39,7 +39,6 @@ data State = State
     {
         board::Board,
         score::Int,
-        jsize:: Int,
         selected::Bool,
         jsize::Int,
         height::Int,
