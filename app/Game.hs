@@ -90,7 +90,7 @@ getSeed :: IO Int
 getSeed = do t <- getCurrentTime
              return $
                 let n = read (show (diffTimeToPicoseconds (utctDayTime t))) in 
-                    mod (div n 1000000) 1000
+                    mod (div n 1000) 1000000
 
 initGame :: Difficulty -> IO () -- TODO
 initGame diff = let iBoard = initBoard 5 6 in
@@ -171,8 +171,7 @@ cancelBlocks s =
                 if (newScore == 0)
                     then s {selected = False}
                     else (cancelBlocks s {board = newBoard, score = (score (s) + newScore), 
-                                            selected = False, seed=newScore+seed(s)})
-              
+                                            selected = False, seed = ((score (s) + newScore) * 991 + seed(s))})
 
 
 -- TODO: may rewrite by using mapWithIndex
@@ -196,7 +195,7 @@ addNewBlocks board jsize seed = zipWith f [0..] board
           where 
             f  j row = zipWith3 f' (replicate (length row) j) [0..] row
             f' i j x = if val(x) == -1
-                        then Block {val = (makeRandomInt jsize (seed+10*i+5*j))}
+                        then Block {val = (makeRandomInt jsize (seed + 67*i + 3*j))}
                         else x
 
 makeRandomInt::Int -> Int -> Int
