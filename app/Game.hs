@@ -53,7 +53,15 @@ initBoard :: Int -> Int -> Board
 initBoard height width = replicate height (replicate width Block {val = 1})
 
 shuffleBoard :: State -> State
-shuffleBoard s = s -- TODO
+shuffleBoard s = State{
+                    board = initBoard bsize bsize ,
+                    score = 0,
+                    selected = False,
+                    row = row s,
+                    col = col s,
+                    seed = 33      
+                    }
+                where bsize = length $ board s
 
 drawState :: State -> [Widget ResourceName] -- TODO: also show score, etc.
 drawState st = drawBoard (board st) (row st) (col st)
