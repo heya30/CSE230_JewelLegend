@@ -36,7 +36,8 @@ executable CSE230-JewelLegend
                       , brick
                       , cursor
                       , vty
-                      , random  
+                      , random
+                      , time
     hs-source-dirs:   app
     default-language: Haskell2010
 

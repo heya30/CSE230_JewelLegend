@@ -14,8 +14,8 @@ import System.Random
 import System.Random (Random(..), newStdGen)
 import System.IO.Unsafe
 import System.Random (newStdGen, randomRs)
-type BoardSize = Int
-type JewelSize = Int
+import Data.Time.Clock
+
 type JewelVal = Int
 
 data Difficulty = Easy | Medium | Hard
@@ -40,6 +40,9 @@ data State = State
         board::Board,
         score::Int,
         selected::Bool,
+        height::Int,
+        width::Int,
+        jsize::Int,
         row::Int,
         col::Int
     }
@@ -47,19 +50,11 @@ data State = State
 
 type ResourceName = String
 
-testBoard :: [[Block]]
-testBoard = initBoardValue 3 3
-
-initBoardValue :: BoardSize -> JewelSize -> [[Block]]
-initBoardValue bsize jsize = [
+initBoard :: Int -> Int -> Int -> Board -- TODO: generate random board
+initBoard height width jsize = [
     [Block {val = 4}, Block {val = 2}, Block {val = 3}],
     [Block {val = 4}, Block {val = 2}, Block {val = 4}],
     [Block {val = 4}, Block {val = 2}, Block {val = 1}]]
-
-
-
-initBoard :: BoardSize -> JewelSize -> Board -- TODO: generate board by bsize and jsize
-initBoard bsize jsize = initBoardValue bsize jsize
 
 shuffleBoard :: State -> State
 shuffleBoard s = s -- TODO
@@ -96,8 +91,8 @@ drawBlockSelected :: Block -> Widget n
 drawBlockSelected blk = str (show (val blk) ++ "< ") -- TODO
 
 initGame :: Difficulty -> IO State -- TODO
-initGame diff = let iBoard = initBoard 3 3 in
-                let iState = State {board = iBoard, score = 0, selected = False, row = 0, col = 0} in
+initGame diff = let iBoard = initBoard 5 6 4 in
+                let iState = State {board = iBoard, score = 0, selected = False, height = 5, width = 6, jsize = 4, row = 0, col = 0} in
                 do 
                    _ <- defaultMain jLApp iState
                    return iState
@@ -170,7 +165,7 @@ cancelBlocks s =
     let oldBoard = board s in
         let removeBoard = (removeBlock oldBoard) in
             let newScore = (eliminatedNum removeBoard)
-                newBoard = (addNewBlocks(downBlock(removeBoard))) in
+                newBoard = (addNewBlocks (downBlock(removeBoard)) (jsize s)) in
                 if (newScore == 0)
                     then s {board = newBoard, score = score (s)}
                     else s {board = newBoard, score = (score (s) + newScore)}
@@ -193,25 +188,25 @@ eliminatedNum board = foldr f 0 board
           f' = foldr (\x n -> if x == Block {val = -1} then n+1 else n) 0
 
 
-addNewBlocks :: [[Block]] -> [[Block]]
-addNewBlocks board = map f board
+addNewBlocks :: Board -> Int -> Board
+addNewBlocks board jsize = map f board
           where 
             f row = map f' row
             f' b = 
                 if val(b) == -1
-                    then Block{val=(1)}  -- TODO: add Random Block
+                    then Block{val = randomInt 1 jsize}  -- TODO: add Random Block
                     else b
 
+-- pseudo random integer generator (lower and upper are output bounds inclusively)
+randomInt :: Int -> Int -> Int
+randomInt lower upper = let seed = 233 in
+                        head(randomRs (lower, upper) (mkStdGen seed))
 
-makeRandomInt::Int -> Int
-makeRandomInt seed = do
-  let gen = mkStdGen seed
-  fst $ randomR (1, 10) gen
-
-randomNum :: IO Int
-randomNum = do
-    num <- randomIO :: IO Int
-    return (makeRandomInt num)
+getSeed :: IO Int
+getSeed = do t <- getCurrentTime
+             return $
+                let n = read (show (diffTimeToPicoseconds (utctDayTime t))) in 
+                    mod (div n 1000000) 1000
 
 downBlock :: [[Block]] -> [[Block]]
 downBlock block = transpose((transpose(transpose(map leftRow (transpose block)))))
