@@ -21,7 +21,7 @@ type JewelVal = Int
 data Difficulty = Easy | Medium | Hard
     deriving (Eq, Show)
 
-data Direction = Up | Down | Left | Right
+data Direction = DirUp | DirDown | DirLeft | DirRight
     deriving (Eq, Show)
 
 data Block = Block
@@ -126,21 +126,21 @@ handleSelectEvent s e =
                 -- EvKey (KEnter) [] -> continue $ s {selected = True}
                 -- EvKey (KUp) [] ->
                 --     case selected s of
-                --         True -> let newState = cancelBlocks (swapBlock s Up) in
+                --         True -> let newState = cancelBlocks (swapBlock s DirUp) in
                 --                 if score newState > score s
                 --                     then continue newState
                 --                     else continue s
-                --         False -> continue $ (moveCursor s Up)
+                --         False -> continue $ (moveCursor s DirUp)
                 _ -> continue s
         _ -> continue s
 
 -- moveCursor :: State -> Direction -> State
 -- moveCursor s d = case d of
---                     Up -> let rowIndex = nonEmptyCursorSelection (board s) in
---                             let colIndex = nonEmptyCursorSelection (nonEmptyCursorCurrent (board s)) in
---                                 let newBoard = nonEmptyCursorSelectIndex (rowIndex - 1) (board s) in
---                                     case newBoard of
---                                         Just newBoard' -> 
+--                     DirUp -> let rowIndex = nonEmptyCursorSelection (board s) in
+--                                 let colIndex = nonEmptyCursorSelection (nonEmptyCursorCurrent (board s)) in
+--                                     let newBoard = nonEmptyCursorSelectIndex (rowIndex - 1) (board s) in
+--                                         case newBoard of
+--                                             Just newBoard' -> 
 
 --                     _ -> s
 
