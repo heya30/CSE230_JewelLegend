@@ -41,6 +41,8 @@ data State = State
         score::Int,
         selected::Bool,
         jsize::Int,
+        height::Int,
+        width::Int,
         row::Int,
         col::Int,
         seed::Int
@@ -53,15 +55,8 @@ initBoard :: Int -> Int -> Board
 initBoard height width = replicate height (replicate width Block {val = 1})
 
 shuffleBoard :: State -> State
-shuffleBoard s = State{
-                    board = initBoard bsize bsize ,
-                    score = 0,
-                    selected = False,
-                    row = row s,
-                    col = col s,
-                    seed = 33      
-                    }
-                where bsize = length $ board s
+shuffleBoard s = let newState = cancelBlocks (s {board = initBoard (height s) (width s), score = 0, selected = False}) in
+                    newState {score = score s, seed = (seed s + seed newState)}
 
 drawState :: State -> [Widget ResourceName] -- TODO: also show score, etc.
 drawState st = drawBoard (board st) (row st) (col st)
@@ -101,10 +96,23 @@ getSeed = do t <- getCurrentTime
                     mod (div n 1000) 1000000
 
 initGame :: Difficulty -> IO () -- TODO
-initGame diff = let iBoard = initBoard 5 6 in
+initGame diff = let height = 5
+                    width = 6
+                    jsize = 4 in
+                let iBoard = initBoard height width in
                 do
                     iSeed <- getSeed
-                    _ <- defaultMain jLApp (cancelBlocks (State {board = iBoard, score = 0, selected = False, jsize = 4, row = 0, col = 0, seed=iSeed}) {score = 0})
+                    _ <- defaultMain jLApp (cancelBlocks (State {
+                                                            board = iBoard,
+                                                            score = 0,
+                                                            selected = False,
+                                                            jsize = jsize,
+                                                            height = height,
+                                                            width = width,
+                                                            row = 0,
+                                                            col = 0,
+                                                            seed = iSeed
+                                                            }) {score = 0})
                     return ()
 
 jLApp :: App State e ResourceName
