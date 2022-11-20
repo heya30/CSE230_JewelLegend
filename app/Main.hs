@@ -6,8 +6,8 @@ main :: IO ()
 main = do
           welcome                                   -- Welcome message
           diff <- pickLevel                         -- pick difficulty level
-          game <- Game.initGame diff                -- play game
-          handleEndGame game                        -- show score and options for restart
+          Game.initGame diff                        -- play game
+        --   handleEndGame game                        -- show score and options for restart
 
 -- Show welcome message
 welcome :: IO ()

@@ -40,8 +40,6 @@ data State = State
         board::Board,
         score::Int,
         selected::Bool,
-        height::Int,
-        width::Int,
         jsize::Int,
         row::Int,
         col::Int,
@@ -51,11 +49,8 @@ data State = State
 
 type ResourceName = String
 
-initBoard :: Int -> Int -> Int -> Board -- TODO: generate random board
-initBoard height width jsize = [
-    [Block {val = 4}, Block {val = 2}, Block {val = 3}],
-    [Block {val = 4}, Block {val = 2}, Block {val = 4}],
-    [Block {val = 4}, Block {val = 2}, Block {val = 1}]]
+initBoard :: Int -> Int -> Board
+initBoard height width = replicate height (replicate width Block {val = 1})
 
 shuffleBoard :: State -> State
 shuffleBoard s = s -- TODO
@@ -91,13 +86,18 @@ drawBlock blk = str (show (val blk) ++ "  ") -- TODO
 drawBlockSelected :: Block -> Widget n
 drawBlockSelected blk = str (show (val blk) ++ "< ") -- TODO
 
-initGame :: Difficulty -> IO State -- TODO
-initGame diff = let iBoard = initBoard 10 3 in
-                let init = State {board = iBoard, score = 0, selected = False, row = 0, col = 0, seed=33} in
-                let iState = ((cancelBlocks init) {score =0}) in
-                do 
-                   _ <- defaultMain jLApp iState
-                   return iState
+getSeed :: IO Int
+getSeed = do t <- getCurrentTime
+             return $
+                let n = read (show (diffTimeToPicoseconds (utctDayTime t))) in 
+                    mod (div n 1000000) 1000
+
+initGame :: Difficulty -> IO () -- TODO
+initGame diff = let iBoard = initBoard 5 6 in
+                do
+                    iSeed <- getSeed
+                    _ <- defaultMain jLApp (cancelBlocks (State {board = iBoard, score = 0, selected = False, jsize = 4, row = 0, col = 0, seed=iSeed}) {score = 0})
+                    return ()
 
 jLApp :: App State e ResourceName
 jLApp = App 
@@ -129,8 +129,8 @@ handleDirection :: State -> Game.Direction -> State
 handleDirection s d = case selected s of
                         True -> let newState = cancelBlocks (swapByDir s d) in
                                 if score newState > score s
-                                    then newState
-                                    else s
+                                    then newState {selected = False}
+                                    else s {selected = False}
                         False -> moveCursor s d
 
 moveCursor :: State -> Game.Direction -> State
@@ -167,7 +167,7 @@ cancelBlocks s =
     let oldBoard = board s in
         let removeBoard = (removeBlock oldBoard) in
             let newScore = (eliminatedNum removeBoard)
-                newBoard = (addNewBlocks(downBlock(removeBoard)) (seed(s))) in
+                newBoard = (addNewBlocks(downBlock(removeBoard)) (jsize s) (seed(s))) in
                 if (newScore == 0)
                     then s {selected = False}
                     else (cancelBlocks s {board = newBoard, score = (score (s) + newScore), 
@@ -191,20 +191,18 @@ eliminatedNum board = foldr f 0 board
           f' = foldr (\x n -> if x == Block {val = -1} then n+1 else n) 0
 
 
-addNewBlocks :: [[Block]] -> Int -> [[Block]]
-addNewBlocks board seed = zipWith f [0..] board
+addNewBlocks :: Board -> Int -> Int -> Board
+addNewBlocks board jsize seed = zipWith f [0..] board
           where 
             f  j row = zipWith3 f' (replicate (length row) j) [0..] row
             f' i j x = if val(x) == -1
-                        then Block {val = (makeRandomInt (seed+10*i+5*j))}
+                        then Block {val = (makeRandomInt jsize (seed+10*i+5*j))}
                         else x
 
-makeRandomInt::Int -> Int
-makeRandomInt seed = do
+makeRandomInt::Int -> Int -> Int
+makeRandomInt jsize seed = do
   let gen = mkStdGen seed
-  fst $ randomR (1, 5) gen
-
-
+  fst $ randomR (1, jsize) gen
 
 downBlock :: [[Block]] -> [[Block]]
 downBlock block = transpose((transpose(transpose(map leftRow (transpose block)))))
