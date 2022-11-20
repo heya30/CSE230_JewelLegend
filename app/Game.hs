@@ -48,18 +48,32 @@ data State = State
 
 type ResourceName = String
 
-testBoard :: [[Block]]
-testBoard = initBoardValue 3 3
 
-initBoardValue :: BoardSize -> JewelSize -> [[Block]]
-initBoardValue bsize jsize = replicate bsize (replicate bsize Block {val = 1})
+
+randomBlock :: Int -> Block
+randomBlock size = Block {val = unsafePerformIO $ getStdRandom $ randomR (1,size)}
 
 initBoard :: BoardSize -> JewelSize -> Board -- TODO: generate board by bsize and jsize
-initBoard bsize jsize = initBoardValue bsize jsize
+initBoard bsize jsize = generateBoard  bsize bsize jsize
+    
+initRow :: Int -> Int -> Row
+initRow 1 jsize = [randomBlock jsize]
+initRow col jsize = [randomBlock jsize] ++ initRow (col-1) jsize
 
-
+generateBoard :: Int -> Int -> Int -> Board
+generateBoard 1 col jsize = [initRow col jsize]
+generateBoard row col jsize  = [initRow col jsize] ++ generateBoard (row-1) col jsize
+    
 shuffleBoard :: State -> State
-shuffleBoard s = s -- TODO
+shuffleBoard s = State{
+                    board = initBoard bsize bsize ,
+                    score = 0,
+                    selected = False,
+                    row = row s,
+                    col = col s,
+                    seed = 33      
+                    }
+                where bsize = length $ board s
 
 drawState :: State -> [Widget ResourceName] -- TODO: also show score, etc.
 drawState st = drawBoard (board st) (row st) (col st)
@@ -93,7 +107,7 @@ drawBlockSelected :: Block -> Widget n
 drawBlockSelected blk = str (show (val blk) ++ "< ") -- TODO
 
 initGame :: Difficulty -> IO State -- TODO
-initGame diff = let iBoard = initBoard 10 3 in
+initGame diff = let iBoard = initBoard 10 5 in
                 let init = State {board = iBoard, score = 0, selected = False, row = 0, col = 0, seed=33} in
                 let iState = ((cancelBlocks init) {score =0}) in
                 do 
