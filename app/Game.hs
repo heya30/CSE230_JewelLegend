@@ -8,9 +8,6 @@ import Brick.Types
 import Brick.Widgets.Core
 
 import Data.List
-import Data.List.NonEmpty (NonEmpty(..))
-import qualified Data.List.NonEmpty as NE
-import Cursor.Simple.List.NonEmpty
 import Graphics.Vty.Attributes
 import Graphics.Vty.Input.Events
 import System.Random
@@ -22,7 +19,10 @@ type JewelSize = Int
 type JewelVal = Int
 
 data Difficulty = Easy | Medium | Hard
-  deriving (Eq, Show)
+    deriving (Eq, Show)
+
+data Direction = DirUp | DirDown | DirLeft | DirRight
+    deriving (Eq, Show)
 
 data Block = Block
     {
@@ -31,14 +31,17 @@ data Block = Block
     deriving (Eq, Show)
 
 
-type Board = NonEmptyCursor Row
+type Board = [Row]
 
-type Row = NonEmptyCursor Block
+type Row = [Block]
 
 data State = State
     {
         board::Board,
-        score::Int
+        score::Int,
+        selected::Bool,
+        row::Int,
+        col::Int
     }
     deriving (Eq, Show)
 
@@ -48,49 +51,56 @@ testBoard :: [[Block]]
 testBoard = initBoardValue 3 3
 
 initBoardValue :: BoardSize -> JewelSize -> [[Block]]
-initBoardValue bsize gsize = [
+initBoardValue bsize jsize = [
     [Block {val = 4}, Block {val = 2}, Block {val = 3}],
     [Block {val = 4}, Block {val = 2}, Block {val = 4}],
     [Block {val = 4}, Block {val = 2}, Block {val = 1}]]
 
 
 
-initBoard :: BoardSize -> JewelSize -> Board -- TODO: generate board by bsize and gsize
-initBoard bsize gsize = setBoardState (initBoardValue bsize gsize)
+initBoard :: BoardSize -> JewelSize -> Board -- TODO: generate board by bsize and jsize
+initBoard bsize jsize = initBoardValue bsize jsize
+
+shuffleBoard :: State -> State
+shuffleBoard s = s -- TODO
 
 drawState :: State -> [Widget ResourceName] -- TODO: also show score, etc.
-drawState st = drawBoard (board st)
+drawState st = drawBoard (board st) (row st) (col st)
 
-drawBoard :: Board -> [Widget ResourceName]
-drawBoard bd = 
-    [vBox $
-    concat
-        [map drawRow $ reverse $ nonEmptyCursorPrev bd,
-        [drawRow $ nonEmptyCursorCurrent bd],
-        map drawRow $ nonEmptyCursorNext bd
-        ]]
+drawBoard :: Board -> Int -> Int -> [Widget ResourceName]
+drawBoard bd row col = [vBox $ drawBoardHelper bd row col]
 
-drawRow :: Row -> Widget n
-drawRow blks = 
-    hBox $ 
-    concat
-        [ map drawBlock $ reverse $ nonEmptyCursorPrev blks
-        , [drawBlock $ nonEmptyCursorCurrent blks]
-        , map drawBlock $ nonEmptyCursorNext blks
-        ]
+drawBoardHelper :: Board -> Int -> Int -> [Widget ResourceName]
+drawBoardHelper bd row col = case bd of
+                                [] -> []
+                                x:xs -> if row == 0
+                                            then (drawRow x col) : (drawBoard xs (-1) col)
+                                            else (drawRow x (-1)) : (drawBoard xs (row - 1) col)
 
-drawBlock :: Block -> Widget n -- TODO: show selected block with highlight (and with figures instead of ints)
-drawBlock blk = str (show (val blk) ++ "  ")
+drawRow :: Row -> Int -> Widget n
+drawRow r col = if col < 0
+                    then hBox $ map drawBlock r
+                    else hBox $ drawRowSelected r col
 
-initGame :: Difficulty -> IO State
+drawRowSelected :: Row -> Int -> [Widget n]
+drawRowSelected r col = case r of
+                            [] -> []
+                            x:xs -> if col == 0
+                                        then (drawBlockSelected x) : (drawRowSelected xs (-1))
+                                        else (drawBlock x) : (drawRowSelected xs (col - 1))
+
+drawBlock :: Block -> Widget n
+drawBlock blk = str (show (val blk) ++ "  ") -- TODO
+
+drawBlockSelected :: Block -> Widget n
+drawBlockSelected blk = str (show (val blk) ++ "< ") -- TODO
+
+initGame :: Difficulty -> IO State -- TODO
 initGame diff = let iBoard = initBoard 3 3 in
-                let iState = State {board = iBoard, score = 0} in
+                let iState = State {board = iBoard, score = 0, selected = False, row = 0, col = 0} in
                 do 
                    _ <- defaultMain jLApp iState
                    return iState
-
-playGame :: State -> IO ()
-playGame b = error "TODO"
 
 jLApp :: App State e ResourceName
 jLApp = App 
@@ -108,22 +118,63 @@ handleSelectEvent s e =
         VtyEvent vtye -> 
             case vtye of
                 EvKey (KChar 'a') [] -> continue $ (cancelBlocks s)
-                EvKey (KChar 'q') [] -> halt s -- TODO: may change exit key (q)
-                -- TODO: capture keyboard/mouse event
+                EvKey (KEsc) [] -> halt s
+                EvKey (KChar 's') [] -> continue $ (shuffleBoard s)
+                EvKey (KEnter) [] -> continue $ s {selected = True}
+                EvKey (KUp) [] -> continue $ (handleDirection s DirUp)
+                EvKey (KDown) [] -> continue $ (handleDirection s DirDown)
+                EvKey (KLeft) [] -> continue $ (handleDirection s DirLeft)
+                EvKey (KRight) [] -> continue $ (handleDirection s DirRight)
                 _ -> continue s
         _ -> continue s
 
+handleDirection :: State -> Game.Direction -> State
+handleDirection s d = case selected s of
+                        True -> let newState = cancelBlocks (swapByDir s d) in
+                                if score newState > score s
+                                    then newState
+                                    else s
+                        False -> moveCursor s d
+
+moveCursor :: State -> Game.Direction -> State
+moveCursor s d = case d of
+                    DirUp -> if row s > 0
+                                then s {row = (row s) - 1}
+                                else s
+                    DirDown -> if row s < length (board s) - 1
+                                then s {row = (row s) + 1}
+                                else s
+                    DirLeft -> if col s > 0
+                                then s {col = (col s) - 1}
+                                else s
+                    DirRight -> if col s < length (head (board s)) - 1
+                                then s {col = (col s) + 1}
+                                else s
+
+swapByDir :: State -> Game.Direction -> State
+swapByDir s d = let b = board s
+                    r = row s
+                    c = col s
+                    newR = row (moveCursor s d)
+                    newC = col (moveCursor s d) in
+                s {board = swapBlock b r c newR newC, selected = False}
+                            
+swapBlock :: Board -> Int -> Int -> Int -> Int -> Board
+swapBlock b row1 col1 row2 col2 = [[get r c x | (c, x) <- zip [0..length temp - 1] temp] | (r, temp) <- zip [0..length b - 1] b]
+                                    where get r c x | (r == row1) && (c == col1) = (b !! row2) !! col2
+                                                    | (r == row2) && (c == col2) = (b !! row1) !! col1
+                                                    | otherwise = x
 
 cancelBlocks :: State -> State
 cancelBlocks s = 
-    let oldBoard = (getBoardList (board(s))) in
+    let oldBoard = board s in
         let removeBoard = (removeBlock oldBoard) in
             let newScore = (eliminatedNum removeBoard)
-                newBoard = setBoardState ((addNewBlocks(downBlock(removeBoard)))) in
+                newBoard = (addNewBlocks(downBlock(removeBoard))) in
                 if (newScore == 0)
-                    then State {board = newBoard, score = score (s)}
-                    else State {board = newBoard, score = (score (s) + newScore)}
-                    -- else (cancelBlocks State {board = newBoard, score = (score (s) + newScore)})
+                    then s {board = newBoard, score = score (s)}
+                    else s {board = newBoard, score = (score (s) + newScore)}
+                    -- else (cancelBlocks s {board = newBoard, score = (score (s) + newScore)})
 
 
 -- TODO: may rewrite by using mapWithIndex
@@ -198,23 +249,3 @@ getBlock :: [[Block]] -> Int -> Int -> Block
 getBlock board row column
     | (column < 0 || row < 0 || row >= (length board) || column >= (length (board!!0))) = Block {val = -1}
     | otherwise = (board !! row) !! column
-
-
-nonEmptyCursorToList :: NonEmptyCursor a -> [a]
-nonEmptyCursorToList s = NE.toList (rebuildNonEmptyCursor s)
-
-
-listToNonEmptyCursor :: [a] -> NonEmptyCursor a
-listToNonEmptyCursor l = case NE.nonEmpty l of
-                                Just r -> makeNonEmptyCursor r
-                                Nothing -> error "empty"
-
-
-getBoardList :: Board -> [[Block]]
-getBoardList s = map nonEmptyCursorToList (nonEmptyCursorToList s)
-
-
-setBoardState :: [[Block]] -> Board
-setBoardState board_list = listToNonEmptyCursor (map listToNonEmptyCursor board_list)
-                                
-
