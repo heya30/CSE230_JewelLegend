@@ -39,6 +39,7 @@ data State = State
     {
         board::Board,
         score::Int,
+        jsize:: Int,
         selected::Bool,
         row::Int,
         col::Int,
@@ -53,8 +54,8 @@ type ResourceName = String
 randomBlock :: Int -> Block
 randomBlock size = Block {val = unsafePerformIO $ getStdRandom $ randomR (1,size)}
 
-initBoard :: BoardSize -> JewelSize -> Board -- TODO: generate board by bsize and jsize
-initBoard bsize jsize = generateBoard  bsize bsize jsize
+initBoard :: BoardSize -> JewelSize -> Board
+initBoard bsize jsize =  generateBoard  bsize bsize jsize
     
 initRow :: Int -> Int -> Row
 initRow 1 jsize = [randomBlock jsize]
@@ -65,15 +66,17 @@ generateBoard 1 col jsize = [initRow col jsize]
 generateBoard row col jsize  = [initRow col jsize] ++ generateBoard (row-1) col jsize
     
 shuffleBoard :: State -> State
-shuffleBoard s = State{
-                    board = initBoard bsize bsize ,
-                    score = 0,
-                    selected = False,
-                    row = row s,
-                    col = col s,
-                    seed = 33      
-                    }
-                where bsize = length $ board s
+shuffleBoard s = cancelBlocks State{
+                                    board = initBoard bsize js ,
+                                    score = 0,
+                                    jsize = js,
+                                    selected = False,
+                                    row = row s,
+                                    col = col s,
+                                    seed = 33      
+                                    }
+                    where bsize = length $ board s
+                          js = jsize s
 
 drawState :: State -> [Widget ResourceName] -- TODO: also show score, etc.
 drawState st = drawBoard (board st) (row st) (col st)
@@ -108,7 +111,7 @@ drawBlockSelected blk = str (show (val blk) ++ "< ") -- TODO
 
 initGame :: Difficulty -> IO State -- TODO
 initGame diff = let iBoard = initBoard 10 5 in
-                let init = State {board = iBoard, score = 0, selected = False, row = 0, col = 0, seed=33} in
+                let init = State {board = iBoard, score = 0, jsize = 5, selected = False, row = 0, col = 0, seed=33} in
                 let iState = ((cancelBlocks init) {score =0}) in
                 do 
                    _ <- defaultMain jLApp iState
