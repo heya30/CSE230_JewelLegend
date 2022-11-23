@@ -16,6 +16,13 @@ import System.IO.Unsafe
 import System.Random (newStdGen, randomRs)
 import Data.Time.Clock
 
+import Brick.Widgets.Border.Style
+import qualified Brick.Widgets.Border as B
+import qualified Brick.Widgets.Border.Style as BS
+import qualified Brick.Widgets.Center as C
+import qualified Brick.Util as U
+import qualified Graphics.Vty as V
+
 type JewelVal = Int
 
 data Difficulty = Easy | Medium | Hard
@@ -49,7 +56,34 @@ data State = State
     }
     deriving (Eq, Show)
 
-type ResourceName = String
+type ResourceName = ()
+
+blueBg, cyanBg,magBg, yellowBg, greenBg,  whiteFg ,titleFg,redFg :: AttrName
+redBg = attrName "redBg"
+blueBg = attrName "blueBg"
+cyanBg = attrName "cyanBg"
+magBg = attrName "magBg"
+yellowBg = attrName "yellowBg"
+greenBg = attrName "greenBg"
+whiteFg = attrName "whiteFg"
+titleFg = attrName "titleFg"
+scoreFg = attrName "scoreFg"
+redFg = attrName "redFg"
+
+theMap :: AttrMap
+theMap = attrMap V.defAttr
+  [
+  (blueBg, U.bg V.blue),
+  (cyanBg, U.bg V.cyan),
+  (yellowBg, U.bg V.yellow),
+  (magBg, U.bg V.magenta),
+  (greenBg, U.bg V.green),
+  (whiteFg, U.fg V.white),
+  (titleFg, U.fg V.cyan `V.withStyle` V.bold),
+  (scoreFg, U.fg V.white `V.withStyle` V.bold),
+  (redFg, U.fg V.red)
+  ]
+
 
 initBoard :: Int -> Int -> Board
 initBoard height width = replicate height (replicate width Block {val = 1})
@@ -58,36 +92,69 @@ shuffleBoard :: State -> State
 shuffleBoard s = let newState = cancelBlocks (s {board = initBoard (height s) (width s), score = 0, selected = False}) in
                     newState {score = score s, seed = (seed s + seed newState)}
 
+
+
 drawState :: State -> [Widget ResourceName] -- TODO: also show score, etc.
-drawState st = drawBoard (board st) (row st) (col st)
+drawState st = [ C.center $  padRight (Pad 4) (drawBoard st) <+> ((drawScore (score st)) <=> padTop (Pad 4) drawHelp)]
 
-drawBoard :: Board -> Int -> Int -> [Widget ResourceName]
-drawBoard bd row col = [vBox $ drawBoardHelper bd row col]
+drawScore :: Int -> Widget ResourceName
+drawScore score = hLimit 20
+  $ withBorderStyle BS.unicodeBold
+  $ withAttr titleFg
+  $ B.borderWithLabel (str " Score ")
+  $ withAttr scoreFg
+  $ C.hCenter
+  $ padAll 1
+  $ str $ show score
 
-drawBoardHelper :: Board -> Int -> Int -> [Widget ResourceName]
-drawBoardHelper bd row col = case bd of
-                                [] -> []
-                                x:xs -> if row == 0
-                                            then (drawRow x col) : (drawBoard xs (-1) col)
-                                            else (drawRow x (-1)) : (drawBoard xs (row - 1) col)
+drawHelp :: Widget ResourceName
+drawHelp = hLimit 20
+  $ withBorderStyle BS.unicodeBold
+  $ withAttr titleFg
+  $ B.borderWithLabel (str " Commands ")
+  $ withAttr whiteFg
+  $ vBox $ map (uncurry drawCommand)
+  $ [ ("Up", "↑")
+    , ("Left", "←")
+    , ("Right", "→")
+    , ("Down", "↓")
+    , ("Select", "Enter")
+    , ("Restart", "r")
+    , ("Quit", "Esc")
+    ]
+  where
+    drawCommand s1 s2 = (padRight Max $ padLeft (Pad 1) $ str s1) <+> (padLeft Max $ padRight (Pad 1) $ str s2)
 
-drawRow :: Row -> Int -> Widget n
-drawRow r col = if col < 0
-                    then hBox $ map drawBlock r
-                    else hBox $ drawRowSelected r col
+lBlock,sBlock :: String
+lBlock = "    \n    "
+sBlock = "  "
 
-drawRowSelected :: Row -> Int -> [Widget n]
-drawRowSelected r col = case r of
-                            [] -> []
-                            x:xs -> if col == 0
-                                        then (drawBlockSelected x) : (drawRowSelected xs (-1))
-                                        else (drawBlock x) : (drawRowSelected xs (col - 1))
+color :: Int -> Widget ()
+color val = case val of
+  1 -> withAttr blueBg $ str lBlock
+  2 -> withAttr cyanBg $ str lBlock
+  3 -> withAttr magBg $ str lBlock
+  4 -> withAttr yellowBg $ str lBlock
+  5 -> withAttr greenBg $ str lBlock
+  _ -> str $ show val
 
-drawBlock :: Block -> Widget n
-drawBlock blk = str (show (val blk) ++ "  ") -- TODO
 
-drawBlockSelected :: Block -> Widget n
-drawBlockSelected blk = str (show (val blk) ++ "< ") -- TODO
+drawBoard :: State -> Widget ResourceName
+drawBoard st = withBorderStyle BS.unicodeBold
+  $ B.borderWithLabel (withAttr titleFg $ str " Jewel Legend ")
+  $ vBox rows
+  where
+    bd = board st
+    col' = col st
+    row' = row st
+    rows = [hBox $  blocksInRow i rowvals |(i, rowvals) <- zip [0..length bd - 1] bd]
+    blocksInRow i rowvals = [hLimit 6 $ vLimit 4 $ drawBlock i j block row' col' | (j, block) <- zip [0..length bd - 1] rowvals]
+
+drawBlock :: Int -> Int -> Block -> Int -> Int -> Widget ResourceName
+drawBlock i j block row' col'
+        | (i == row')&& (j == col') = C.center $ B.border $ color $ val block
+        | otherwise =  C.center $  color $ val block
+
 
 getSeed :: IO Int
 getSeed = do t <- getCurrentTime
@@ -122,7 +189,7 @@ jLApp = App
             appChooseCursor = showFirstCursor,
             appHandleEvent = handleSelectEvent,
             appStartEvent = pure,
-            appAttrMap = const $ attrMap mempty []
+            appAttrMap = const theMap
         }
 
 handleSelectEvent :: State -> BrickEvent n e -> EventM n (Next State)
