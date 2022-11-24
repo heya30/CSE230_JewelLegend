@@ -147,8 +147,8 @@ drawBoard st = withBorderStyle BS.unicodeBold
     bd = board st
     col' = col st
     row' = row st
-    rows = [hBox $  blocksInRow i rowvals |(i, rowvals) <- zip [0..length bd - 1] bd]
-    blocksInRow i rowvals = [hLimit 6 $ vLimit 4 $ drawBlock i j block row' col' | (j, block) <- zip [0..length bd - 1] rowvals]
+    rows = [hBox $  blocksInRow i rowvals |(i, rowvals) <- zip [0..height st - 1] bd]
+    blocksInRow i rowvals = [hLimit 6 $ vLimit 4 $ drawBlock i j block row' col' | (j, block) <- zip [0..width st - 1] rowvals]
 
 drawBlock :: Int -> Int -> Block -> Int -> Int -> Widget ResourceName
 drawBlock i j block row' col'
