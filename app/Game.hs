@@ -58,13 +58,19 @@ data State = State
 
 type ResourceName = ()
 
-blueBg, cyanBg,magBg, yellowBg, greenBg,  whiteFg ,titleFg,redFg :: AttrName
-redBg = attrName "redBg"
+blueBg, cyanBg, magBg, yellowBg, greenBg, brightBlueBg, brightCyanBg, brightMagBg, brightGreenBg, whiteFg, titleFg, redFg :: AttrName
+
 blueBg = attrName "blueBg"
 cyanBg = attrName "cyanBg"
 magBg = attrName "magBg"
 yellowBg = attrName "yellowBg"
 greenBg = attrName "greenBg"
+
+brightBlueBg = attrName "brightBlueBg"
+brightCyanBg = attrName "brightCyanBg"
+brightMagBg = attrName "brightMagBg"
+brightGreenBg = attrName "brightGreenBg"
+
 whiteFg = attrName "whiteFg"
 titleFg = attrName "titleFg"
 scoreFg = attrName "scoreFg"
@@ -75,9 +81,13 @@ theMap = attrMap V.defAttr
   [
   (blueBg, U.bg V.blue),
   (cyanBg, U.bg V.cyan),
-  (yellowBg, U.bg V.yellow),
   (magBg, U.bg V.magenta),
+  (yellowBg, U.bg V.yellow),
   (greenBg, U.bg V.green),
+  (brightBlueBg, U.bg V.brightBlue),
+  (brightCyanBg, U.bg V.brightCyan),
+  (brightMagBg, U.bg V.brightMagenta),
+  (brightGreenBg, U.bg V.brightGreen),
   (whiteFg, U.fg V.white),
   (titleFg, U.fg V.cyan `V.withStyle` V.bold),
   (scoreFg, U.fg V.white `V.withStyle` V.bold),
@@ -139,7 +149,11 @@ color val = case val of
   3 -> withAttr magBg $ str (strBlock val)
   4 -> withAttr yellowBg $ str (strBlock val)
   5 -> withAttr greenBg $ str (strBlock val)
-  _ -> str $ show val
+  6 -> withAttr brightBlueBg $ str (strBlock val)
+  7 -> withAttr brightCyanBg $ str (strBlock val)
+  8 -> withAttr brightMagBg $ str (strBlock val)
+  9 -> withAttr brightGreenBg $ str (strBlock val)
+  _ -> str (strBlock val)
 
 
 drawBoard :: State -> Widget ResourceName
@@ -169,7 +183,7 @@ getSeed = do t <- getCurrentTime
 initGame :: Difficulty -> IO () -- TODO
 initGame diff = let height = 5
                     width = 6
-                    jsize = 4 in
+                    jsize = 9 in
                 let iBoard = initBoard height width in
                 do
                     iSeed <- getSeed
