@@ -23,6 +23,11 @@ import qualified Brick.Widgets.Center as C
 import qualified Brick.Util as U
 import qualified Graphics.Vty as V
 
+-- positive integers for jewels
+-- 0 for eliminated jewel
+-- -1 for bombed jewel
+-- -2 for horizontal bomb block
+-- -3 for vertical bomb block
 type JewelVal = Int
 
 data Difficulty = Easy | Medium | Hard
@@ -58,7 +63,7 @@ data State = State
 
 type ResourceName = ()
 
-blueBg, cyanBg, magBg, yellowBg, greenBg, brightBlueBg, brightCyanBg, brightMagBg, brightGreenBg, whiteFg, titleFg, redFg :: AttrName
+blueBg, cyanBg, magBg, yellowBg, greenBg, brightBlueBg, brightCyanBg, brightMagBg, brightGreenBg, redBg, whiteFg, titleFg, redFg :: AttrName
 
 blueBg = attrName "blueBg"
 cyanBg = attrName "cyanBg"
@@ -70,6 +75,8 @@ brightBlueBg = attrName "brightBlueBg"
 brightCyanBg = attrName "brightCyanBg"
 brightMagBg = attrName "brightMagBg"
 brightGreenBg = attrName "brightGreenBg"
+
+redBg = attrName "redBg"
 
 whiteFg = attrName "whiteFg"
 titleFg = attrName "titleFg"
@@ -88,6 +95,7 @@ theMap = attrMap V.defAttr
   (brightCyanBg, U.bg V.brightCyan),
   (brightMagBg, U.bg V.brightMagenta),
   (brightGreenBg, U.bg V.brightGreen),
+  (redBg, U.bg V.red),
   (whiteFg, U.fg V.white),
   (titleFg, U.fg V.cyan `V.withStyle` V.bold),
   (scoreFg, U.fg V.white `V.withStyle` V.bold),
@@ -96,7 +104,7 @@ theMap = attrMap V.defAttr
 
 
 initBoard :: Int -> Int -> Board
-initBoard height width = replicate height (replicate width Block {val = 1})
+initBoard height width = replicate height (replicate width Block {val = 0})
 
 shuffleBoard :: State -> State
 shuffleBoard s = let newState = cancelBlocks (s {board = initBoard (height s) (width s), score = 0, selected = False}) in
@@ -142,8 +150,16 @@ sBlock = "  "
 strBlock :: JewelVal -> String
 strBlock v = "     \n  " ++ show v ++ "  \n     "
 
+hBombBlock :: String
+hBombBlock = "     \n --- \n     "
+
+vBombBlock :: String
+vBombBlock = "     \n  |  \n     "
+
 color :: JewelVal -> Widget ()
 color val = case val of
+  -2-> withAttr redBg $ str (hBombBlock)
+  -3-> withAttr redBg $ str (vBombBlock)
   1 -> withAttr blueBg $ str (strBlock val)
   2 -> withAttr cyanBg $ str (strBlock val)
   3 -> withAttr magBg $ str (strBlock val)
@@ -181,9 +197,9 @@ getSeed = do t <- getCurrentTime
                     mod (div n 1000) 1000000
 
 initGame :: Difficulty -> IO () -- TODO
-initGame diff = let height = 5
-                    width = 6
-                    jsize = 9 in
+initGame diff = let height = 6
+                    width = 8
+                    jsize = 5 in
                 let iBoard = initBoard height width in
                 do
                     iSeed <- getSeed
@@ -255,8 +271,64 @@ swapByDir s d = let b = board s
                     c = col s
                     newR = row (moveCursor s d)
                     newC = col (moveCursor s d) in
-                s {board = swapBlock b r c newR newC, selected = False}
-                            
+                    if (val ((b!!r)!!c) == -2) && ((d == DirLeft) || (d == DirRight)) && (newC /= c)
+                        then s {board = hBomb b r, selected = False} -- horizontal bomb
+                        else if (val ((b!!r)!!c) == -3) && ((d == DirUp) || (d == DirDown)) && (newR /= r)
+                            then s {board = vBomb b c, selected = False} -- vertical Bomb
+                            else s {board = swapBlock b r c newR newC, selected = False}
+
+hBomb :: Board -> Int -> Board
+hBomb b row = [[get r c x | (c, x) <- zip [0..length temp - 1] temp] | (r, temp) <- zip [0..length b - 1] b]
+                    where get r c x | (r == row) = Block {val = -1}
+                                    | otherwise = x
+
+hBombGen :: Board -> Int -> Int -> Bool
+hBombGen b row col = let curVal = val ((b!!row)!!col) in
+                        (curVal > 0)
+                        && (col + 3 < length (b!!row))
+                        &&
+                        (
+                            (
+                            (col == 0) 
+                            && (val ((b!!row)!!(col+1)) == curVal) 
+                            && (val ((b!!row)!!(col+2)) == curVal) 
+                            && (val ((b!!row)!!(col+3)) == curVal)
+                            )
+                        ||  (
+                            (col > 0)
+                            && (val ((b!!row)!!(col-1)) /= curVal)
+                            && (val ((b!!row)!!(col+1)) == curVal) 
+                            && (val ((b!!row)!!(col+2)) == curVal) 
+                            && (val ((b!!row)!!(col+3)) == curVal)
+                            )
+                        )
+
+vBomb :: Board -> Int -> Board
+vBomb b col = [[get r c x | (c, x) <- zip [0..length temp - 1] temp] | (r, temp) <- zip [0..length b - 1] b]
+                    where get r c x | (c == col) = Block {val = -1}
+                                    | otherwise = x
+
+vBombGen :: Board -> Int -> Int -> Bool
+vBombGen b row col = let curVal = val ((b!!row)!!col) in
+                        (curVal > 0)
+                        && (row - 3 >= 0)
+                        &&
+                        (
+                            (
+                            (row == length b - 1) 
+                            && (val ((b!!(row-1))!!col) == curVal) 
+                            && (val ((b!!(row-2))!!col) == curVal) 
+                            && (val ((b!!(row-3))!!col) == curVal)
+                            )
+                        ||  (
+                            (row < length b - 1) 
+                            && (val ((b!!(row+1))!!col) /= curVal)
+                            && (val ((b!!(row-1))!!col) == curVal) 
+                            && (val ((b!!(row-2))!!col) == curVal) 
+                            && (val ((b!!(row-3))!!col) == curVal)
+                            )
+                        )
+
 swapBlock :: Board -> Int -> Int -> Int -> Int -> Board
 swapBlock b row1 col1 row2 col2 = [[get r c x | (c, x) <- zip [0..length temp - 1] temp] | (r, temp) <- zip [0..length b - 1] b]
                                     where get r c x | (r == row1) && (c == col1) = (b !! row2) !! col2
@@ -280,22 +352,23 @@ removeBlock :: [[Block]] -> [[Block]]
 removeBlock board = zipWith f [0..] board
           where 
             f  j row = zipWith3 f' (replicate (length row) j) [0..] row
-            f' i j x = if ifBlockEliminable board (i) (j)
-                        then Block {val = -1}
-                        else x
+            f' i j x =  if hBombGen board i j then Block {val = -2}
+                            else if vBombGen board i j then Block {val = -3}
+                                    else if ifBlockEliminable board (i) (j) then Block {val = 0}
+                                            else x
 
 eliminatedNum :: [[Block]] -> Int
 eliminatedNum board = foldr f 0 board
     where f x acc =  (f' x) + acc
           f' :: [Block] -> Int
-          f' = foldr (\x n -> if x == Block {val = -1} then n+1 else n) 0
+          f' = foldr (\x n -> if (val x == 0) || (val x == -1) then n+1 else n) 0
 
 
 addNewBlocks :: Board -> Int -> Int -> Board
 addNewBlocks board jsize seed = zipWith f [0..] board
           where 
             f  j row = zipWith3 f' (replicate (length row) j) [0..] row
-            f' i j x = if val(x) == -1
+            f' i j x = if ((val x == 0) || (val x == -1))
                         then Block {val = (makeRandomInt jsize (seed + 67*i + 3*j))}
                         else x
 
@@ -309,11 +382,11 @@ downBlock block = transpose((transpose(transpose(map leftRow (transpose block)))
 
 mergeRow :: [Block] -> [Block]
 mergeRow row = case row of
-  x:xs -> if val(x) == -1 then mergeRow xs else x:(mergeRow xs)
+  x:xs -> if ((val x == 0) || (val x == -1)) then mergeRow xs else x:(mergeRow xs)
   [] -> []
 
 leftRow :: [Block] -> [Block]
-leftRow row = (replicate ((length row) - (length x)) (Block {val = -1})) ++ x 
+leftRow row = (replicate ((length row) - (length x)) (Block {val = 0})) ++ x 
   where x = mergeRow row
 
 leftBlock :: [[Block]] -> [[Block]]
@@ -321,8 +394,8 @@ leftBlock g = map leftRow g
        
 
 ifBlockEliminable :: [[Block]] -> Int -> Int -> Bool
-ifBlockEliminable board row column = matchInRow board row column
-    || matchInRow (transpose board) column row
+ifBlockEliminable board row column = (val ((board!!row)!!column) > 0) && 
+                                        (matchInRow board row column || matchInRow (transpose board) column row)
 
 
 matchInRow :: [[Block]] -> Int -> Int -> Bool
