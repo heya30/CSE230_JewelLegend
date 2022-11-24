@@ -119,7 +119,7 @@ drawHelp = hLimit 20
     , ("Right", "→")
     , ("Down", "↓")
     , ("Select", "Enter")
-    , ("Restart", "r")
+    , ("Shuffle", "s")
     , ("Quit", "Esc")
     ]
   where
@@ -129,13 +129,16 @@ lBlock,sBlock :: String
 lBlock = "    \n    "
 sBlock = "  "
 
-color :: Int -> Widget ()
+strBlock :: JewelVal -> String
+strBlock v = "     \n  " ++ show v ++ "  \n     "
+
+color :: JewelVal -> Widget ()
 color val = case val of
-  1 -> withAttr blueBg $ str lBlock
-  2 -> withAttr cyanBg $ str lBlock
-  3 -> withAttr magBg $ str lBlock
-  4 -> withAttr yellowBg $ str lBlock
-  5 -> withAttr greenBg $ str lBlock
+  1 -> withAttr blueBg $ str (strBlock val)
+  2 -> withAttr cyanBg $ str (strBlock val)
+  3 -> withAttr magBg $ str (strBlock val)
+  4 -> withAttr yellowBg $ str (strBlock val)
+  5 -> withAttr greenBg $ str (strBlock val)
   _ -> str $ show val
 
 
@@ -148,10 +151,11 @@ drawBoard st = withBorderStyle BS.unicodeBold
     col' = col st
     row' = row st
     rows = [hBox $  blocksInRow i rowvals |(i, rowvals) <- zip [0..height st - 1] bd]
-    blocksInRow i rowvals = [hLimit 6 $ vLimit 4 $ drawBlock i j block row' col' | (j, block) <- zip [0..width st - 1] rowvals]
+    blocksInRow i rowvals = [hLimit 8 $ vLimit 5 $ drawBlock i j block row' col' (selected st) | (j, block) <- zip [0..width st - 1] rowvals]
 
-drawBlock :: Int -> Int -> Block -> Int -> Int -> Widget ResourceName
-drawBlock i j block row' col'
+drawBlock :: Int -> Int -> Block -> Int -> Int -> Bool -> Widget ResourceName
+drawBlock i j block row' col' s
+        | (i == row')&& (j == col') && (s) = C.center $ B.border $ color $ val block -- TODO: signal selected block
         | (i == row')&& (j == col') = C.center $ B.border $ color $ val block
         | otherwise =  C.center $  color $ val block
 
@@ -169,7 +173,7 @@ initGame diff = let height = 5
                 let iBoard = initBoard height width in
                 do
                     iSeed <- getSeed
-                    _ <- defaultMain jLApp (cancelBlocks (State {
+                    _ <- defaultMain jLApp (cancelBlocks State {
                                                             board = iBoard,
                                                             score = 0,
                                                             selected = False,
@@ -179,7 +183,7 @@ initGame diff = let height = 5
                                                             row = 0,
                                                             col = 0,
                                                             seed = iSeed
-                                                            }) {score = 0})
+                                                            }) {score = 0}
                     return ()
 
 jLApp :: App State e ResourceName
