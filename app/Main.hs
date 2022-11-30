@@ -7,7 +7,7 @@ main = do
           welcome                                   -- Welcome message
           diff <- pickLevel                         -- pick difficulty level
           Game.initGame diff                        -- play game
-        --   handleEndGame game                        -- show score and options for restart
+          handleEndGame                        -- show score and options for restart
 
 -- Show welcome message
 welcome :: IO ()
@@ -15,12 +15,21 @@ welcome = putStrLn "Welcome!"
 
 -- Ask for difficulty
 pickLevel :: IO Game.Difficulty
-pickLevel = putStrLn "Please select the difficulty level: (Easy/Medium/Hard)" >>
+pickLevel = do
+            putStrLn "Please select the difficulty level: (Easy/Medium/Hard)" 
             -- TODO: parsing input
-            return Game.Easy
+            name <- getLine
+            if name == "Easy" then return Game.Easy
+            else if name == "Medium" then return Game.Medium
+            else if name == "Hard" then return Game.Hard
+            else pickLevel
+            -- return Game.Easy
 
 -- Show score and ask for restart or exit
-handleEndGame :: Game.State -> IO ()
-handleEndGame b = error "TODO"
+handleEndGame :: IO ()
+handleEndGame = do
+            putStrLn "Well Done" 
+
+
 
 

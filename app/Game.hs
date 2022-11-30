@@ -45,6 +45,7 @@ data State = State
         width::Int,
         row::Int,
         col::Int,
+        step::Int,
         seed::Int
     }
     deriving (Eq, Show)
@@ -98,7 +99,8 @@ getSeed = do t <- getCurrentTime
 initGame :: Difficulty -> IO () -- TODO
 initGame diff = let height = 5
                     width = 6
-                    jsize = 4 in
+                    jsize = 4
+                    step = 1 in
                 let iBoard = initBoard height width in
                 do
                     iSeed <- getSeed
@@ -111,6 +113,7 @@ initGame diff = let height = 5
                                                             width = width,
                                                             row = 0,
                                                             col = 0,
+                                                            step = step,
                                                             seed = iSeed
                                                             }) {score = 0})
                     return ()
@@ -127,7 +130,8 @@ jLApp = App
 
 handleSelectEvent :: State -> BrickEvent n e -> EventM n (Next State)
 handleSelectEvent s e =
-    case e of 
+    if step s == 0 then halt s
+    else case e of 
         VtyEvent vtye -> 
             case vtye of
                 EvKey (KChar 'a') [] -> continue $ (cancelBlocks s)
@@ -145,7 +149,7 @@ handleDirection :: State -> Game.Direction -> State
 handleDirection s d = case selected s of
                         True -> let newState = cancelBlocks (swapByDir s d) in
                                 if score newState > score s
-                                    then newState {selected = False}
+                                    then newState {selected = False, step = (step (s) - 1)}
                                     else s {selected = False}
                         False -> moveCursor s d
 
