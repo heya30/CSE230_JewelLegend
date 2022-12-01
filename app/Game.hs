@@ -118,7 +118,7 @@ initBoard :: Int -> Int -> Board
 initBoard height width = replicate height (replicate width Block {val = 0})
 
 shuffleBoard :: State -> State
-shuffleBoard s = let newState = cancelBlocks (s {board = initBoard (height s) (width s), score = 0, selected = False}) in
+shuffleBoard s = let newState = initFirstBoard (s {board = initBoard (height s) (width s), score = 0, selected = False}) in
                     newState {score = score s, seed = (seed s + seed newState)}
 
 
@@ -213,7 +213,7 @@ initGame :: Difficulty -> IO () -- TODO
 initGame diff = let height = 5
                     width = 6
                     jsize = 4
-                    step = 1 in
+                    step = 5 in
                 let iBoard = initBoard height width in
                 do
                     iSeed <- getSeed
