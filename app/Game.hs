@@ -21,7 +21,14 @@ import qualified Brick.Widgets.Border as B
 import qualified Brick.Widgets.Border.Style as BS
 import qualified Brick.Widgets.Center as C
 import qualified Brick.Util as U
+import qualified Graphics.Vty
+
+import Brick.BChan (newBChan, writeBChan)
 import qualified Graphics.Vty as V
+import Control.Concurrent (threadDelay, forkIO)
+import Control.Monad (forever, void)
+
+data Tick = Tick
 
 -- positive integers for jewels
 -- 0 for eliminated jewel
@@ -57,7 +64,10 @@ data State = State
         width::Int,
         row::Int,
         col::Int,
-        seed::Int
+        seed::Int,
+        time::Float,
+        blockState::Int
+
     }
     deriving (Eq, Show)
 
@@ -113,13 +123,15 @@ shuffleBoard s = let newState = cancelBlocks (s {board = initBoard (height s) (w
 
 
 drawState :: State -> [Widget ResourceName] -- TODO: also show score, etc.
-drawState st = [ C.center $  padRight (Pad 4) (drawBoard st) <+> ((drawScore (score st)) <=> padTop (Pad 4) drawHelp)]
+drawState st = [C.center $  padRight (Pad 4) (drawBoard st) <+> 
+    ((drawScore (round (time st)) (" time ")) <=> (drawScore (score st) " Score ") <=> padTop (Pad 2) drawHelp)
+    ]
 
-drawScore :: Int -> Widget ResourceName
-drawScore score = hLimit 20
+drawScore :: Int -> String -> Widget ResourceName
+drawScore score title = hLimit 20
   $ withBorderStyle BS.unicodeBold
   $ withAttr titleFg
-  $ B.borderWithLabel (str " Score ")
+  $ B.borderWithLabel (str title)
   $ withAttr scoreFg
   $ C.hCenter
   $ padAll 1
@@ -203,7 +215,13 @@ initGame diff = let height = 6
                 let iBoard = initBoard height width in
                 do
                     iSeed <- getSeed
-                    _ <- defaultMain jLApp (cancelBlocks State {
+                    chan <- newBChan 10
+                    forkIO $ forever $ do
+                        writeBChan chan Tick
+                        threadDelay 200000 -- decides how fast your game moves
+                    let buildVty = Graphics.Vty.mkVty Graphics.Vty.defaultConfig
+                    initialVty <- buildVty
+                    void $ customMain initialVty buildVty (Just chan) jLApp (initFirstBoard State {
                                                             board = iBoard,
                                                             score = 0,
                                                             selected = False,
@@ -212,11 +230,13 @@ initGame diff = let height = 6
                                                             width = width,
                                                             row = 0,
                                                             col = 0,
-                                                            seed = iSeed
+                                                            seed = iSeed,
+                                                            time = 60,
+                                                            blockState = 0
                                                             }) {score = 0}
                     return ()
 
-jLApp :: App State e ResourceName
+jLApp :: App State Tick ResourceName
 jLApp = App 
         {
             appDraw = drawState,
@@ -226,9 +246,10 @@ jLApp = App
             appAttrMap = const theMap
         }
 
-handleSelectEvent :: State -> BrickEvent n e -> EventM n (Next State)
+handleSelectEvent :: State -> BrickEvent n Tick -> EventM n (Next State)
 handleSelectEvent s e =
     case e of 
+        AppEvent Tick -> continue $ handleTickEvent s
         VtyEvent vtye -> 
             case vtye of
                 EvKey (KChar 'a') [] -> continue $ (cancelBlocks s)
@@ -241,6 +262,13 @@ handleSelectEvent s e =
                 EvKey (KRight) [] -> continue $ (handleDirection s DirRight)
                 _ -> continue s
         _ -> continue s
+
+handleTickEvent :: State -> State
+handleTickEvent s =  if (blockState s) == 1
+                        then s {time = (time s) - 0.2, board = downBlock (board s), blockState = 2}
+                        else if (blockState s) == 2
+                            then s {time = (time s) - 0.2, board = addNewBlocks (board s) (jsize s) (seed(s)), blockState = 3}
+                            else (cancelBlocks s) {time = (time s) - 0.2}
 
 handleDirection :: State -> Game.Direction -> State
 handleDirection s d = case selected s of
@@ -335,16 +363,28 @@ swapBlock b row1 col1 row2 col2 = [[get r c x | (c, x) <- zip [0..length temp - 
                                                     | (r == row2) && (c == col2) = (b !! row1) !! col1
                                                     | otherwise = x
 
+initFirstBoard :: State -> State
+initFirstBoard s = 
+    let oldBoard = board s in
+        let removeBoard = (removeBlock oldBoard) in
+            let newScore = (eliminatedNum removeBoard) 
+                newBoard = (addNewBlocks(downBlock(removeBoard)) (jsize s) (seed(s))) in
+                if (newScore == 0)
+                    then s {selected = False}
+                    else (initFirstBoard s {board = newBoard, score = (score (s) + newScore), 
+                                            selected = False, seed = ((score (s) + newScore) * 991 + seed(s))})
+
+
 cancelBlocks :: State -> State
 cancelBlocks s = 
     let oldBoard = board s in
         let removeBoard = (removeBlock oldBoard) in
-            let newScore = (eliminatedNum removeBoard)
-                newBoard = (addNewBlocks(downBlock(removeBoard)) (jsize s) (seed(s))) in
+            let newScore = (eliminatedNum removeBoard) in
+                -- newBoard = (addNewBlocks(downBlock(removeBoard)) (jsize s) (seed(s))) in
                 if (newScore == 0)
-                    then s {selected = False}
-                    else (cancelBlocks s {board = newBoard, score = (score (s) + newScore), 
-                                            selected = False, seed = ((score (s) + newScore) * 991 + seed(s))})
+                    then s 
+                    else (s {board = removeBoard, score = (score (s) + newScore), 
+                                seed = ((score (s) + newScore) * 991 + seed(s)), blockState = 1})
 
 
 -- TODO: may rewrite by using mapWithIndex
