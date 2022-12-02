@@ -252,18 +252,19 @@ jLApp = App
 handleSelectEvent :: State -> BrickEvent n Tick -> EventM n (Next State)
 handleSelectEvent s e =
     case e of 
+        AppEvent Tick -> continue $ handleTickEvent s
         VtyEvent vtye -> 
-            case vtye of
-                EvKey (KChar 'a') [] -> continue $ (cancelBlocks s)
-                EvKey (KEsc) [] -> halt s
-                EvKey (KChar 's') [] -> continue $ (shuffleBoard s)
-                EvKey (KEnter) [] -> continue $ s {selected = True}
-                EvKey (KUp) [] ->  continue $ (handleDirection s DirUp)
-                EvKey (KDown) [] -> continue $ (handleDirection s DirDown)
-                EvKey (KLeft) [] -> continue $ (handleDirection s DirLeft)
-                EvKey (KRight) [] -> continue $ (handleDirection s DirRight)
+             case vtye of
+                 EvKey (KChar 'a') [] -> continue $ (cancelBlocks s)
+                 EvKey (KEsc) [] -> halt s
+                 EvKey (KChar 's') [] -> continue $ (shuffleBoard s)
+                 EvKey (KEnter) [] -> continue $ s {selected = True}
+                 EvKey (KUp) [] ->  continue $ (handleDirection s DirUp)
+                 EvKey (KDown) [] -> continue $ (handleDirection s DirDown)
+                 EvKey (KLeft) [] -> continue $ (handleDirection s DirLeft)
+                 EvKey (KRight) [] -> continue $ (handleDirection s DirRight)
                 _ -> continue s
-        _ -> continue s
+    _ -> continue s
 
 handleTickEvent :: State -> State
 handleTickEvent s =  if (blockState s) == 1
