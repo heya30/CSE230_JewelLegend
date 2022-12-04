@@ -67,7 +67,10 @@ data State = State
         seed::Int,
         time::Float,
         step::Int,
-        blockState::Int
+        blockState::Int, 
+        second_col::Int,
+        second_row::Int,
+        swap_valid::(Bool,Int)
 
     }
     deriving (Eq, Show)
@@ -110,7 +113,7 @@ theMap = attrMap V.defAttr
   (whiteFg, U.fg V.white),
   (titleFg, U.fg V.cyan `V.withStyle` V.bold),
   (scoreFg, U.fg V.white `V.withStyle` V.bold),
-  (redFg, U.fg V.red)
+  (redFg, U.fg V.red `V.withStyle` V.bold)
   ]
 
 
@@ -124,9 +127,18 @@ shuffleBoard s = let newState = initFirstBoard (s {board = initBoard (height s) 
 
 
 drawState :: State -> [Widget ResourceName] -- TODO: also show score, etc.
-drawState st = [C.center $  padRight (Pad 4) (drawBoard st) <+> 
+drawState st = [C.center $( drawValid (swap_valid st) <=> padRight (Pad 4) (drawBoard st)) <+> 
     ((drawScore (round (time st)) (" time ")) <=> (drawScore (score st) " Score ") <=> padTop (Pad 2) drawHelp)
     ]
+
+drawValid :: (Bool,Int) -> Widget ResourceName
+drawValid v@(valid,num) = C.hCenter
+  $ withBorderStyle BS.unicodeBold
+  $ withAttr redFg
+  $ C.hCenter
+  $ if valid
+    then str "       "
+    else str " Invaild Swap "
 
 drawScore :: Int -> String -> Widget ResourceName
 drawScore score title = hLimit 20
@@ -156,9 +168,9 @@ drawHelp = hLimit 20
   where
     drawCommand s1 s2 = (padRight Max $ padLeft (Pad 1) $ str s1) <+> (padLeft Max $ padRight (Pad 1) $ str s2)
 
-lBlock,sBlock :: String
-lBlock = "    \n    "
-sBlock = "  "
+blankBlock :: String
+blankBlock = "     \n     \n     "
+
 
 strBlock :: JewelVal -> String
 strBlock v = "     \n  " ++ show v ++ "  \n     "
@@ -182,23 +194,26 @@ color val = case val of
   7 -> withAttr brightCyanBg $ str (strBlock val)
   8 -> withAttr brightMagBg $ str (strBlock val)
   9 -> withAttr brightGreenBg $ str (strBlock val)
-  _ -> str (strBlock val)
+  _ -> str blankBlock
 
 
 drawBoard :: State -> Widget ResourceName
-drawBoard st = withBorderStyle BS.unicodeBold
+drawBoard st = C.hCenter $ withBorderStyle BS.unicodeBold
   $ B.borderWithLabel (withAttr titleFg $ str " Jewel Legend ")
   $ vBox rows
   where
     bd = board st
     col' = col st
     row' = row st
+    row2 = second_row st
+    col2 = second_col st
     rows = [hBox $  blocksInRow i rowvals |(i, rowvals) <- zip [0..height st - 1] bd]
-    blocksInRow i rowvals = [hLimit 8 $ vLimit 5 $ drawBlock i j block row' col' (selected st) | (j, block) <- zip [0..width st - 1] rowvals]
+    blocksInRow i rowvals = [hLimit 8 $ vLimit 5 $ drawBlock i j block row' col' (selected st) row2 col2| (j, block) <- zip [0..width st - 1] rowvals]
 
-drawBlock :: Int -> Int -> Block -> Int -> Int -> Bool -> Widget ResourceName
-drawBlock i j block row' col' s
-        | (i == row')&& (j == col') && (s) = C.center $ B.border $ color $ val block -- TODO: signal selected block
+drawBlock :: Int -> Int -> Block -> Int -> Int -> Bool ->Int -> Int  ->  Widget ResourceName
+drawBlock i j block row' col' s row2 col2
+        | (i == row2)&& (j == col2)  = C.center $  withBorderStyle ascii $ B.border $ color $ val block  
+        | (i == row')&& (j == col') && (s) = C.center $  withBorderStyle ascii $ B.border $ color $ val block -- TODO: signal selected block
         | (i == row')&& (j == col') = C.center $ B.border $ color $ val block
         | otherwise =  C.center $  color $ val block
 
@@ -235,8 +250,13 @@ initGame diff = let height = 5
                                                             step = step,
                                                             seed = iSeed,
                                                             time = 60,
-                                                            blockState = 0
-                                                            }) {score = 0}
+                                                            blockState = 0,
+                                                            second_row = -1,
+                                                            second_col = -1,
+                                                            swap_valid = (True,0)
+                                                            }) {score = 0,
+                                                                second_row = -1,
+                                                                second_col = -1}
                     return ()
 
 jLApp :: App State Tick ResourceName
@@ -268,18 +288,29 @@ handleSelectEvent s e =
         _ -> continue s
 
 handleTickEvent :: State -> State
-handleTickEvent s =  if (blockState s) == 1
-                        then s {time = (time s) - 0.2, board = downBlock (board s), blockState = 2}
-                        else if (blockState s) == 2
-                            then s {time = (time s) - 0.2, board = addNewBlocks (board s) (jsize s) (seed(s)), blockState = 3}
-                            else (cancelBlocks s) {time = (time s) - 0.2}
+handleTickEvent s = case swap_valid s of
+                        (False,0) -> s {swap_valid = (True,0)} 
+                        (False,1) -> s {swap_valid = (False,0)} 
+                        (False,2) ->s {swap_valid = (False,1)} 
+                        (False,3) ->s {swap_valid = (False,2)} 
+                        (True,0) ->
+                                let bs = blockState s in
+                                    case bs of
+                                        0 -> s {time = (time s) - 0.2}
+                                        1 -> s {time = (time s) - 0.2, board = downBlock (board s), blockState = 2}
+                                        2 -> s {time = (time s) - 0.2, board = addNewBlocks (board s) (jsize s) (seed(s)), blockState = 3}
+                                        3 -> let newState = cancelBlocks s in
+                                                if score newState > score s
+                                                then (cancelBlocks s) {time = (time s) - 0.2}
+                                                else s {time = (time s) - 0.2, second_row = -1, second_col = -1, blockState = 0}
+
 
 handleDirection :: State -> Game.Direction -> State
 handleDirection s d = case selected s of
                         True -> let newState = cancelBlocks (swapByDir s d) in
                                 if score newState > score s
                                     then newState {selected = False, step = (step (s) - 1)}
-                                    else s {selected = False}
+                                    else s {selected = False, swap_valid = (False,3)}
                         False -> moveCursor s d
 
 moveCursor :: State -> Game.Direction -> State
@@ -304,10 +335,12 @@ swapByDir s d = let b = board s
                     newR = row (moveCursor s d)
                     newC = col (moveCursor s d) in
                     if (val ((b!!r)!!c) == -2) && ((d == DirLeft) || (d == DirRight)) && (newC /= c)
-                        then s {board = hBomb b r, selected = False} -- horizontal bomb
+                        then s {board = hBomb b r, selected = False,  second_row = newR, second_col = newC} -- horizontal bomb
                         else if (val ((b!!r)!!c) == -3) && ((d == DirUp) || (d == DirDown)) && (newR /= r)
-                            then s {board = vBomb b c, selected = False} -- vertical Bomb
-                            else s {board = swapBlock b r c newR newC, selected = False}
+                            then s {board = vBomb b c, selected = False, second_row = newR, second_col = newC} -- vertical Bomb
+                            else if (newR /= r) || (newC /= c)
+                                then s {board = swapBlock b r c newR newC, selected = False,  second_row = newR, second_col = newC}
+                                else s {board = swapBlock b r c newR newC, selected = False}
 
 hBomb :: Board -> Int -> Board
 hBomb b row = [[get r c x | (c, x) <- zip [0..length temp - 1] temp] | (r, temp) <- zip [0..length b - 1] b]
