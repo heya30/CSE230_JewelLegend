@@ -71,8 +71,8 @@ data State = State
         second_col::Int,
         second_row::Int,
         swap_valid::(Bool,Int),
-        shuffle_times::Int
-
+        shuffle_times::Int,
+        gameState::Int
     }
     deriving (Eq, Show)
 
@@ -90,6 +90,7 @@ brightBlueBg = attrName "brightBlueBg"
 brightCyanBg = attrName "brightCyanBg"
 brightMagBg = attrName "brightMagBg"
 brightGreenBg = attrName "brightGreenBg"
+gameOverAttr = attrName "gameOver"
 
 redBg = attrName "redBg"
 
@@ -114,7 +115,8 @@ theMap = attrMap V.defAttr
   (whiteFg, U.fg V.white),
   (titleFg, U.fg V.cyan `V.withStyle` V.bold),
   (scoreFg, U.fg V.white `V.withStyle` V.bold),
-  (redFg, U.fg V.red `V.withStyle` V.bold)
+  (redFg, U.fg V.red `V.withStyle` V.bold),
+  (gameOverAttr, U.fg V.red `V.withStyle` V.bold)
   ]
 
 
@@ -128,9 +130,40 @@ shuffleBoard s = let newState = initFirstBoard (s {board = initBoard (height s) 
 
 
 drawState :: State -> [Widget ResourceName] -- TODO: also show score, etc.
-drawState st = [C.center $( drawValid (swap_valid st) <=> padRight (Pad 4) (drawBoard st)) <+> 
+drawState st = if (gameState st) == 1 then [(drawEnd (score st))]
+    else [C.center $( drawValid (swap_valid st) <=> padRight (Pad 4) (drawBoard st)) <+> 
     ((drawScore (round (time st)) (" time ")) <=> (drawScore (score st) " Score ") <=> (drawScore (shuffle_times st) " Shuffle Times ")<=> padTop (Pad 2) drawHelp)
     ]
+drawEnd :: Int -> Widget ResourceName
+drawEnd score = hLimit 30
+    -- $ vBox [ ( C.hCenter 
+    --          $ withAttr gameOverAttr 
+    --          $ C.hCenter 
+    --          $ str "GAME OVER your total score is")
+    --      , ( str $ show score)
+    -- ]
+    $ withBorderStyle BS.unicodeBold
+    $ withAttr gameOverAttr
+    $ B.borderWithLabel (str "GAME OVER")
+    $ vBox [ ( withAttr gameOverAttr
+                $ C.hCenter
+                $ padAll 1
+                $ str $ ("your total score is ") ++ (show score)),
+             ( withAttr scoreFg
+                $ C.hCenter
+                $ padAll 1
+                $ str $ "press r to restart"),
+            ( withAttr scoreFg
+                $ C.hCenter
+                $ padAll 1
+                $ str $ "press e to end")
+         
+    ]
+    -- $ withAttr gameOverAttr
+    -- $ C.hCenter
+    -- $ padAll 1
+    -- $ str $ "your total score is" show score
+
 
 drawValid :: (Bool,Int) -> Widget ResourceName
 drawValid v@(valid,num) = C.hCenter
@@ -256,7 +289,8 @@ initGame diff = let height = 5
                                                             second_row = -1,
                                                             second_col = -1,
                                                             swap_valid = (True,0),
-                                                            shuffle_times = shuffle_times
+                                                            shuffle_times = shuffle_times,
+                                                            gameState = 0
                                                             }) {score = 0,
                                                                 second_row = -1,
                                                                 second_col = -1}
@@ -274,23 +308,41 @@ jLApp = App
 
 handleSelectEvent :: State -> BrickEvent n Tick -> EventM n (Next State)
 handleSelectEvent s e =
-    if step s == 0 then halt s
-    else case e of 
-        AppEvent Tick -> continue $ handleTickEvent s
-        VtyEvent vtye -> 
-            case vtye of
-                EvKey (KChar 'a') [] -> continue $ (cancelBlocks s)
-                EvKey (KEsc) [] -> halt s
-                EvKey (KChar 's') [] -> if (shuffle_times s) == 0 
+    if time s <= 0 then continue $ (timeUp s)
+    else 
+        if gameState s == 0 then
+            case e of 
+                AppEvent Tick -> continue $ handleTickEvent s
+                VtyEvent vtye -> 
+                    case vtye of
+                        EvKey (KChar 'a') [] -> continue $ (cancelBlocks s)
+                        EvKey (KEsc) [] -> halt s
+                        EvKey (KChar 's') [] ->  if (shuffle_times s) == 0 
                                             then continue $ s
                                             else continue $ (shuffleBoard s){shuffle_times = (shuffle_times s) - 1}
-                EvKey (KEnter) [] -> continue $ s {selected = True}
-                EvKey (KUp) [] -> continue $ (handleDirection s DirUp)
-                EvKey (KDown) [] -> continue $ (handleDirection s DirDown)
-                EvKey (KLeft) [] -> continue $ (handleDirection s DirLeft)
-                EvKey (KRight) [] -> continue $ (handleDirection s DirRight)
+                        EvKey (KEnter) [] -> continue $ s {selected = True}
+                        EvKey (KUp) [] -> continue $ (handleDirection s DirUp)
+                        EvKey (KDown) [] -> continue $ (handleDirection s DirDown)
+                        EvKey (KLeft) [] -> continue $ (handleDirection s DirLeft)
+                        EvKey (KRight) [] -> continue $ (handleDirection s DirRight)
+                        _ -> continue s
                 _ -> continue s
-        _ -> continue s
+        else
+            case e of 
+                VtyEvent vtye -> 
+                    case vtye of
+                        EvKey (KChar 'e') [] -> halt s
+                        EvKey (KEsc) [] -> halt s
+                        EvKey (KChar 'r') [] -> continue $ (restart s)
+                        _ -> continue s
+                _ -> continue s
+
+timeUp :: State -> State
+timeUp s = s {gameState = 1, time = 60}           
+
+restart ::  State -> State
+restart s = let newState = initFirstBoard (s {board = initBoard (height s) (width s), score = 0, selected = False}) in
+                    newState {score = 0, seed = (seed s + seed newState), gameState = 0}
 
 handleTickEvent :: State -> State
 handleTickEvent s = case swap_valid s of
