@@ -259,10 +259,10 @@ getSeed = do t <- getCurrentTime
                     mod (div n 1000) 1000000
 
 initGame :: Difficulty -> IO () -- TODO
-initGame diff = let height = 5
+initGame diff = let height = 7
                     shuffle_times = 3
-                    width = 6
-                    jsize = 4
+                    width = 7
+                    jsize = getDiffJSize diff
                     step = 5 in
                 let iBoard = initBoard height width in
                 do
@@ -295,6 +295,12 @@ initGame diff = let height = 5
                                                                 second_row = -1,
                                                                 second_col = -1}
                     return ()
+
+getDiffJSize :: Difficulty -> Int
+getDiffJSize diff = case diff of
+                        Easy -> 4
+                        Medium -> 6
+                        Hard -> 8
 
 jLApp :: App State Tick ResourceName
 jLApp = App 
