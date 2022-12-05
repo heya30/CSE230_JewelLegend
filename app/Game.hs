@@ -342,7 +342,7 @@ timeUp s = s {gameState = 1, time = 60}
 
 restart ::  State -> State
 restart s = let newState = initFirstBoard (s {board = initBoard (height s) (width s), score = 0, selected = False}) in
-                    newState {score = 0, seed = (seed s + seed newState), gameState = 0}
+                    newState {score = 0, seed = (seed s + seed newState), gameState = 0, shuffle_times = 3}
 
 handleTickEvent :: State -> State
 handleTickEvent s = case swap_valid s of
