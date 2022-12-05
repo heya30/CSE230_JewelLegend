@@ -70,7 +70,8 @@ data State = State
         blockState::Int, 
         second_col::Int,
         second_row::Int,
-        swap_valid::(Bool,Int)
+        swap_valid::(Bool,Int),
+        shuffle_times::Int
 
     }
     deriving (Eq, Show)
@@ -128,7 +129,7 @@ shuffleBoard s = let newState = initFirstBoard (s {board = initBoard (height s) 
 
 drawState :: State -> [Widget ResourceName] -- TODO: also show score, etc.
 drawState st = [C.center $( drawValid (swap_valid st) <=> padRight (Pad 4) (drawBoard st)) <+> 
-    ((drawScore (round (time st)) (" time ")) <=> (drawScore (score st) " Score ") <=> padTop (Pad 2) drawHelp)
+    ((drawScore (round (time st)) (" time ")) <=> (drawScore (score st) " Score ") <=> (drawScore (shuffle_times st) " Shuffle Times ")<=> padTop (Pad 2) drawHelp)
     ]
 
 drawValid :: (Bool,Int) -> Widget ResourceName
@@ -212,9 +213,9 @@ drawBoard st = C.hCenter $ withBorderStyle BS.unicodeBold
 
 drawBlock :: Int -> Int -> Block -> Int -> Int -> Bool ->Int -> Int  ->  Widget ResourceName
 drawBlock i j block row' col' s row2 col2
-        | (i == row2)&& (j == col2)  = C.center $  withBorderStyle ascii $ B.border $ color $ val block  
-        | (i == row')&& (j == col') && (s) = C.center $  withBorderStyle ascii $ B.border $ color $ val block -- TODO: signal selected block
-        | (i == row')&& (j == col') = C.center $ B.border $ color $ val block
+        | (i == row2)&& (j == col2)  = C.center $ B.border $ color $ val block  
+        | (i == row')&& (j == col') && (s) = C.center $ B.border $ color $ val block -- TODO: signal selected block
+        | (i == row')&& (j == col') = C.center $ withBorderStyle ascii $ B.border $ color $ val block
         | otherwise =  C.center $  color $ val block
 
 
@@ -226,6 +227,7 @@ getSeed = do t <- getCurrentTime
 
 initGame :: Difficulty -> IO () -- TODO
 initGame diff = let height = 5
+                    shuffle_times = 3
                     width = 6
                     jsize = 4
                     step = 5 in
@@ -235,7 +237,7 @@ initGame diff = let height = 5
                     chan <- newBChan 10
                     forkIO $ forever $ do
                         writeBChan chan Tick
-                        threadDelay 200000 -- decides how fast your game moves
+                        threadDelay 300000 -- decides how fast your game moves
                     let buildVty = Graphics.Vty.mkVty Graphics.Vty.defaultConfig
                     initialVty <- buildVty
                     void $ customMain initialVty buildVty (Just chan) jLApp (initFirstBoard State {
@@ -253,7 +255,8 @@ initGame diff = let height = 5
                                                             blockState = 0,
                                                             second_row = -1,
                                                             second_col = -1,
-                                                            swap_valid = (True,0)
+                                                            swap_valid = (True,0),
+                                                            shuffle_times = shuffle_times
                                                             }) {score = 0,
                                                                 second_row = -1,
                                                                 second_col = -1}
@@ -278,7 +281,9 @@ handleSelectEvent s e =
             case vtye of
                 EvKey (KChar 'a') [] -> continue $ (cancelBlocks s)
                 EvKey (KEsc) [] -> halt s
-                EvKey (KChar 's') [] -> continue $ (shuffleBoard s)
+                EvKey (KChar 's') [] -> if (shuffle_times s) == 0 
+                                            then continue $ s
+                                            else continue $ (shuffleBoard s){shuffle_times = (shuffle_times s) - 1}
                 EvKey (KEnter) [] -> continue $ s {selected = True}
                 EvKey (KUp) [] -> continue $ (handleDirection s DirUp)
                 EvKey (KDown) [] -> continue $ (handleDirection s DirDown)
@@ -290,26 +295,28 @@ handleSelectEvent s e =
 handleTickEvent :: State -> State
 handleTickEvent s = case swap_valid s of
                         (False,0) -> s {swap_valid = (True,0)} 
-                        (False,1) -> s {swap_valid = (False,0)} 
-                        (False,2) ->s {swap_valid = (False,1)} 
-                        (False,3) ->s {swap_valid = (False,2)} 
+                        (False,i) -> s {swap_valid = (False,(i-1))}
                         (True,0) ->
                                 let bs = blockState s in
                                     case bs of
-                                        0 -> s {time = (time s) - 0.2}
-                                        1 -> s {time = (time s) - 0.2, board = downBlock (board s), blockState = 2}
-                                        2 -> s {time = (time s) - 0.2, board = addNewBlocks (board s) (jsize s) (seed(s)), blockState = 3}
+                                        0 -> s {time = (time s) - 0.3}
+                                        1 -> s {time = (time s) - 0.3, board = downBlock (board s), blockState = 2}
+                                        2 -> s {time = (time s) - 0.3, board = addNewBlocks (board s) (jsize s) (seed(s)), blockState = 3}
                                         3 -> let newState = cancelBlocks s in
                                                 if score newState > score s
-                                                then (cancelBlocks s) {time = (time s) - 0.2}
-                                                else s {time = (time s) - 0.2, second_row = -1, second_col = -1, blockState = 0}
+                                                then (cancelBlocks s) {time = (time s) - 0.3}
+                                                else s {time = (time s) - 0.3,  blockState = 0}
+                                        4 -> let newState = cancelBlocks s in
+                                                newState {selected = False, step = (step (s) - 1), second_row = -1, second_col = -1}
+                                                 
 
 
 handleDirection :: State -> Game.Direction -> State
 handleDirection s d = case selected s of
+                        -- True -> (swapByDir s d) {blockState = 4}
                         True -> let newState = cancelBlocks (swapByDir s d) in
                                 if score newState > score s
-                                    then newState {selected = False, step = (step (s) - 1)}
+                                    then (swapByDir s d) {blockState = 4}
                                     else s {selected = False, swap_valid = (False,3)}
                         False -> moveCursor s d
 
