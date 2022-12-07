@@ -135,7 +135,7 @@ drawState st = if (gameState st) == 1 then [(drawEnd (score st))]
     ((drawScore (round (time st)) (" time ")) <=> (drawScore (score st) " Score ") <=> (drawScore (shuffle_times st) " Shuffle Times ")<=> padTop (Pad 2) drawHelp)
     ]
 drawEnd :: Int -> Widget ResourceName
-drawEnd score = hLimit 30
+drawEnd score = C.center $ hLimit 30
     -- $ vBox [ ( C.hCenter 
     --          $ withAttr gameOverAttr 
     --          $ C.hCenter 
@@ -166,16 +166,16 @@ drawEnd score = hLimit 30
 
 
 drawValid :: (Bool,Int) -> Widget ResourceName
-drawValid v@(valid,num) = C.hCenter
+drawValid v@(valid,num) =  C.hCenter 
   $ withBorderStyle BS.unicodeBold
   $ withAttr redFg
   $ C.hCenter
   $ if valid
     then str "       "
-    else str " Invaild Swap "
+    else str "Invaild Swap    "
 
 drawScore :: Int -> String -> Widget ResourceName
-drawScore score title = hLimit 20
+drawScore score title =  hLimit 20
   $ withBorderStyle BS.unicodeBold
   $ withAttr titleFg
   $ B.borderWithLabel (str title)
